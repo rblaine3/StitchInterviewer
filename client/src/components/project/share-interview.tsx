@@ -19,6 +19,8 @@ interface ShareInterviewProps {
 }
 
 export default function ShareInterview({ projectId }: ShareInterviewProps) {
+  // Early guard for undefined projectId
+  const actualProjectId = projectId || 0;
   const { toast } = useToast();
   const [shareableLink, setShareableLink] = useState<string>("");
   const [isLinkCopied, setIsLinkCopied] = useState(false);
@@ -27,15 +29,15 @@ export default function ShareInterview({ projectId }: ShareInterviewProps) {
   const generateLinkMutation = useMutation({
     mutationFn: async () => {
       // Validate project ID
-      if (!projectId) {
+      if (actualProjectId <= 0) {
         throw new Error("Project ID is missing or invalid");
       }
       
-      console.log("Generating shareable link for project ID:", projectId);
+      console.log("Generating shareable link for project ID:", actualProjectId);
       
       const response = await apiRequest(
         "POST",
-        `/api/projects/${projectId}/share`
+        `/api/projects/${actualProjectId}/share`
       );
       return response.json();
     },

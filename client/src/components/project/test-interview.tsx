@@ -30,8 +30,8 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
   
   // Ensure we have a project with interview prompts
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
-    queryKey: ["/api/projects", projectId],
-    enabled: !!projectId,
+    queryKey: ["/api/projects", actualProjectId],
+    enabled: actualProjectId > 0,
   });
 
   // Create the interview
@@ -40,15 +40,15 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
       setIsCreatingCall(true);
       
       // Ensure we have a valid project ID
-      if (!projectId) {
+      if (actualProjectId <= 0) {
         throw new Error("Project ID is missing or invalid");
       }
       
-      console.log("Creating interview for project ID:", projectId);
+      console.log("Creating interview for project ID:", actualProjectId);
       
       const response = await apiRequest(
         "POST",
-        `/api/projects/${projectId}/create-interview`
+        `/api/projects/${actualProjectId}/create-interview`
       );
       return response.json();
     },
@@ -69,8 +69,11 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
   // Initialize the Vapi client when the interview is started
   const startInterview = async (callId: string) => {
     try {
+      console.log("Starting interview with call ID:", callId);
+      
       // Create a new Vapi instance with the call ID
-      // The constructor should take a callId as its second parameter
+      // Note: We don't need to pass an API key here since the backend creates the call
+      // The client-side Vapi instance just needs the callId
       const vapi = new Vapi("", callId);
 
       // Set up event listeners for volume levels
@@ -80,12 +83,25 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
 
       // Set up event listeners for call ending
       vapi.on("call-end", () => {
+        console.log("Interview call ended");
         setIsInterviewActive(false);
         setIsCreatingCall(false);
       });
 
+      // Set up event listeners for errors
+      vapi.on("error", (error) => {
+        console.error("Vapi error:", error);
+        toast({
+          title: "Interview error",
+          description: "There was an error during the interview. Please try again.",
+          variant: "destructive",
+        });
+      });
+
+      console.log("Starting Vapi call");
       // Start the call using the callId from our backend
       await vapi.start();
+      console.log("Vapi call started successfully");
 
       // Save the instance to state
       setVapiInstance(vapi);

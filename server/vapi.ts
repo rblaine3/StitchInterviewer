@@ -71,6 +71,7 @@ export async function createInterviewAssistant(projectId: number) {
         model: "gpt-4o",
         temperature: 0.7,
       },
+      systemPrompt: assistantPrompt,
       firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives.",
     });
 
