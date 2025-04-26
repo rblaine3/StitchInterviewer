@@ -24,6 +24,9 @@ export default function ProjectDetailPage() {
   const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
   const projectId = parseInt(params.id);
+  
+  // Log the parsed projectId
+  console.log("ProjectDetailPage parsed projectId:", projectId);
   const { user, logoutMutation } = useAuth();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -176,15 +179,27 @@ export default function ProjectDetailPage() {
             
             {/* Tab contents */}
             <TabsContent value="research-plan" className="py-6">
-              {project && <ResearchPlan projectId={project.id} />}
+              {project && (
+                <ResearchPlan 
+                  projectId={Number(project.id)} 
+                />
+              )}
             </TabsContent>
             
             <TabsContent value="test-interview" className="py-6">
-              {project && <TestInterview projectId={project.id} />}
+              {project && (
+                <TestInterview 
+                  projectId={Number(project.id)}
+                />
+              )}
             </TabsContent>
             
             <TabsContent value="share" className="py-6">
-              {project && <ShareInterview projectId={project.id} />}
+              {project && (
+                <ShareInterview 
+                  projectId={Number(project.id)}
+                />
+              )}
             </TabsContent>
             
             <TabsContent value="transcripts" className="py-6">

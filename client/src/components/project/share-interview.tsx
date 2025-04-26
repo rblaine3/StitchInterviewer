@@ -19,8 +19,11 @@ interface ShareInterviewProps {
 }
 
 export default function ShareInterview({ projectId }: ShareInterviewProps) {
-  // Early guard for undefined projectId
-  const actualProjectId = projectId || 0;
+  // Log the incoming projectId for debugging
+  console.log("ShareInterview received projectId:", projectId);
+  
+  // Early guard for undefined or NaN projectId
+  const actualProjectId = (projectId && !isNaN(projectId)) ? projectId : 0;
   const { toast } = useToast();
   const [shareableLink, setShareableLink] = useState<string>("");
   const [isLinkCopied, setIsLinkCopied] = useState(false);

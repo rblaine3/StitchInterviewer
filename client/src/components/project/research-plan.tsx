@@ -15,8 +15,11 @@ interface ResearchPlanProps {
 }
 
 export default function ResearchPlan({ projectId }: ResearchPlanProps) {
-  // Early guard for undefined projectId
-  const actualProjectId = projectId || 0;
+  // Log the incoming projectId for debugging
+  console.log("ResearchPlan received projectId:", projectId);
+  
+  // Early guard for undefined or NaN projectId
+  const actualProjectId = (projectId && !isNaN(projectId)) ? projectId : 0;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
