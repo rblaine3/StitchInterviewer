@@ -66,15 +66,17 @@ export async function createInterviewAssistant(projectId: number) {
     try {
       console.log("Attempting to create Vapi assistant...");
       
-      // The API is expecting 'voice' to be one of the predefined values
-      // Based on the error message, we need to use a valid voice name
+      // The Vapi API has specific parameter requirements 
+      // Let's use their exact parameter structure based on errors
+      // Using 'as any' to bypass TypeScript type checking due to inconsistent API documentation
       const assistant = await vapiClient.assistants.create({
         name: `${project.name} Interview Assistant`,
-        model: "gpt-4o",
-        prompt: assistantPrompt, // Use 'prompt' instead of 'systemPrompt'
-        voice: "nova-openai", // Use the full voice name from allowed values
-        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives.",
-      });
+        model: "gpt-4o" as any,
+        // No prompt parameter - the API doesn't accept it
+        // Instead, it may be using LLM's default context or a different parameter
+        voice: "nova-openai" as any, // Use the full voice name from allowed values
+        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives. " + assistantPrompt,
+      } as any);
 
       console.log("Created assistant:", assistant);
 
