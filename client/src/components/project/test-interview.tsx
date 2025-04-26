@@ -19,6 +19,8 @@ interface TestInterviewProps {
 }
 
 export default function TestInterview({ projectId }: TestInterviewProps) {
+  // Early guard for undefined projectId
+  const actualProjectId = projectId || 0;
   const { toast } = useToast();
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [vapiInstance, setVapiInstance] = useState<Vapi | null>(null);

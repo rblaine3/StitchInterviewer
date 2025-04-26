@@ -32,10 +32,11 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   
   // Effect to update objective when project data loads
   useEffect(() => {
-    if (project && objective === null && project.researchObjective) {
-      setObjective(project.researchObjective);
+    if (project) {
+      // Always update the objective from the project
+      setObjective(project.researchObjective || '');
     }
-  }, [project, objective]);
+  }, [project]);
 
   // Fetch research materials for the project
   const { data: materials, isLoading: isLoadingMaterials } = useQuery<ResearchMaterial[]>({

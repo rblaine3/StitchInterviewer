@@ -309,6 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw error;
       }
       
+      console.log(`Enhancing prompt for project ${projectId}, useKnowledgeBase: ${useKnowledgeBase}`);
+      
       const project = await storage.getProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
@@ -318,10 +320,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
+      // First, save the objective immediately so we don't lose it even if enhancing fails
+      await storage.updateResearchObjective(projectId, objective);
+      console.log(`Updated research objective for project ${projectId}`);
+      
       // If using knowledge base, get the file contents
       let fileContents: string[] = [];
       if (useKnowledgeBase) {
         const materials = await storage.getResearchMaterials(projectId);
+        console.log(`Found ${materials.length} research materials for project ${projectId}`);
         
         // Extract content from text files
         for (const material of materials) {
@@ -339,10 +346,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Call OpenAI to enhance the prompt
+      console.log(`Calling OpenAI to enhance prompt with ${fileContents.length} documents`);
       const enhancedPrompt = await enhancePrompt(objective, fileContents.length > 0 ? fileContents : undefined);
       
       // Update the project with the new prompt
       await storage.updateInterviewPrompt(projectId, enhancedPrompt);
+      console.log(`Updated interview prompt for project ${projectId}`);
       
       res.json({ prompt: enhancedPrompt });
     } catch (error) {
