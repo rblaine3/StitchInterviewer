@@ -32,8 +32,11 @@ export default function SharedInterviewPage() {
           throw new Error("Interview not found or has expired");
         }
 
-        // Initialize Vapi with the call ID
-        const vapi = new Vapi(process.env.VAPI_API_KEY || "");
+        // Initialize Vapi without an API key, since we'll use the callId
+        const vapi = new Vapi("");
+        
+        // Configure the call using the callId
+        vapi.setCallId(callId);
         
         // Set up event listeners
         vapi.on("volume-level", (level) => {
