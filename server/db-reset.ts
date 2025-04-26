@@ -1,11 +1,20 @@
 import { db } from './db';
-import { users, projects, researchMaterials } from '@shared/schema';
 import { sql } from 'drizzle-orm';
 
 async function main() {
-  console.log('Creating database tables...');
+  console.log('Dropping and recreating database tables...');
 
   try {
+    // Drop existing tables in the correct order (reverse dependency)
+    await db.execute(sql`DROP TABLE IF EXISTS research_materials CASCADE`);
+    console.log('Dropped research_materials table.');
+    
+    await db.execute(sql`DROP TABLE IF EXISTS projects CASCADE`);
+    console.log('Dropped projects table.');
+    
+    await db.execute(sql`DROP TABLE IF EXISTS users CASCADE`);
+    console.log('Dropped users table.');
+    
     // Create users table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -44,9 +53,9 @@ async function main() {
     `);
     console.log('Research materials table created.');
 
-    console.log('Database setup complete.');
+    console.log('Database reset complete.');
   } catch (error) {
-    console.error('Error creating database tables:', error);
+    console.error('Error resetting database tables:', error);
     process.exit(1);
   }
 }
