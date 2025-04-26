@@ -59,12 +59,9 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
   // Initialize the Vapi client when the interview is started
   const startInterview = async (callId: string) => {
     try {
-      // We don't need to provide an API key when using a callId
-      // The server has already created the call with its API key
-      const vapi = new Vapi("");
-      
-      // Configure the call using the callId from our backend
-      vapi.setCallId(callId);
+      // Create a new Vapi instance with the call ID
+      // The constructor should take a callId as its second parameter
+      const vapi = new Vapi("", callId);
 
       // Set up event listeners for volume levels
       vapi.on("volume-level", (level) => {
