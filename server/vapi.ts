@@ -4,7 +4,7 @@ import fs from "fs";
 
 // Initialize the Vapi client with the API key
 const vapiClient = new VapiClient({
-  apiKey: process.env.VAPI_API_KEY,
+  apiKey: process.env.VAPI_API_KEY as string,
 });
 
 // Create a interview assistant based on project research objectives and materials
@@ -53,22 +53,21 @@ export async function createInterviewAssistant(projectId: number) {
         provider: "openai",
         model: "gpt-4o",
         temperature: 0.7,
-        functions: [],
       },
       systemPrompt: assistantPrompt,
     });
 
     // For voice calls we need to create a Vapi call
     const call = await vapiClient.calls.create({
-      assistant_id: assistant.id,
+      assistantId: assistant.assistantId,
       metadata: {
         projectId: projectId.toString(),
       }
     });
 
     return { 
-      callId: call.id,
-      assistantId: assistant.id
+      callId: call.callId,
+      assistantId: assistant.assistantId
     };
   } catch (error) {
     console.error("Error creating Vapi interview assistant:", error);

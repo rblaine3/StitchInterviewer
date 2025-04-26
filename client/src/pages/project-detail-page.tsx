@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectModal from "@/components/project/project-modal";
 import DeleteProjectDialog from "@/components/project/delete-project-dialog";
 import ResearchPlan from "@/components/project/research-plan";
+import TestInterview from "@/components/project/test-interview";
+import ShareInterview from "@/components/project/share-interview";
 import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Edit, Trash, Loader2, Code, BellIcon, User, LogOut } from "lucide-react";
 import { 
@@ -178,27 +180,11 @@ export default function ProjectDetailPage() {
             </TabsContent>
             
             <TabsContent value="test-interview" className="py-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Test Interview</CardTitle>
-                  <CardDescription>Conduct interview sessions with AI assistance.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center py-12 text-gray-500">
-                  Test Interview functionality will be implemented in future updates.
-                </CardContent>
-              </Card>
+              {project && <TestInterview projectId={project.id} />}
             </TabsContent>
             
             <TabsContent value="share" className="py-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Share</CardTitle>
-                  <CardDescription>Share your project with team members or clients.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center py-12 text-gray-500">
-                  Sharing functionality will be implemented in future updates.
-                </CardContent>
-              </Card>
+              {project && <ShareInterview projectId={project.id} />}
             </TabsContent>
             
             <TabsContent value="transcripts" className="py-6">

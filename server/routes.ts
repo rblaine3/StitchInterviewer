@@ -9,6 +9,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { enhancePrompt } from "./openai";
+import { createInterviewAssistant, getCall, generateShareableLink } from "./vapi";
 
 // Setup multer for file uploads
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -347,6 +348,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error enhancing prompt:", error);
       res.status(500).json({ message: "Failed to enhance prompt" });
+    }
+  });
+
+  // Vapi Interview Routes
+  // Create a new interview assistant for test interview
+  app.post("/api/projects/:id/create-interview", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const result = await createInterviewAssistant(projectId);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating interview:", error);
+      res.status(500).json({ message: "Failed to create interview" });
+    }
+  });
+
+  // Get call details (for both test interview and shared interviews)
+  app.get("/api/calls/:callId", async (req: Request, res: Response) => {
+    try {
+      const { callId } = req.params;
+      const call = await getCall(callId);
+      res.json(call);
+    } catch (error) {
+      console.error("Error fetching call:", error);
+      res.status(500).json({ message: "Failed to fetch call details" });
+    }
+  });
+
+  // Generate a shareable interview link
+  app.post("/api/projects/:id/share", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const result = await generateShareableLink(projectId);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error generating shareable link:", error);
+      res.status(500).json({ message: "Failed to generate shareable link" });
     }
   });
 

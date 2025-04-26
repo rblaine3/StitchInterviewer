@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import ProjectDetailPage from "@/pages/project-detail-page";
+import SharedInterviewPage from "@/pages/shared-interview-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
