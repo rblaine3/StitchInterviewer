@@ -7,6 +7,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
 import { eq } from "drizzle-orm";
+import { IStorage } from "./storage";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -16,7 +17,10 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
       pool, 
-      createTableIfMissing: true 
+      createTableIfMissing: true,
+      // Clear expired sessions and clean up on startup
+      pruneSessionInterval: 60, // 1 minute
+      tableName: 'session'
     });
   }
 
@@ -124,4 +128,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-import { IStorage } from "./storage";
+// Export the DatabaseStorage as default
+export default DatabaseStorage;
