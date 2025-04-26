@@ -36,6 +36,14 @@ export default function TestInterview({ projectId }: TestInterviewProps) {
   const createInterviewMutation = useMutation({
     mutationFn: async () => {
       setIsCreatingCall(true);
+      
+      // Ensure we have a valid project ID
+      if (!projectId) {
+        throw new Error("Project ID is missing or invalid");
+      }
+      
+      console.log("Creating interview for project ID:", projectId);
+      
       const response = await apiRequest(
         "POST",
         `/api/projects/${projectId}/create-interview`

@@ -26,6 +26,13 @@ export default function ShareInterview({ projectId }: ShareInterviewProps) {
   // Generate a shareable link
   const generateLinkMutation = useMutation({
     mutationFn: async () => {
+      // Validate project ID
+      if (!projectId) {
+        throw new Error("Project ID is missing or invalid");
+      }
+      
+      console.log("Generating shareable link for project ID:", projectId);
+      
       const response = await apiRequest(
         "POST",
         `/api/projects/${projectId}/share`

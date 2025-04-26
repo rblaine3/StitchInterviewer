@@ -3,9 +3,8 @@ import { storage } from "./storage";
 import fs from "fs";
 
 // Initialize the Vapi client with the API key
-const vapiClient = new VapiClient({
-  apiKey: process.env.VAPI_API_KEY as string,
-});
+// The VapiClient expects the key in the constructor directly, not as an options object
+const vapiClient = new VapiClient(process.env.VAPI_API_KEY as string);
 
 // Create a interview assistant based on project research objectives and materials
 export async function createInterviewAssistant(projectId: number) {
@@ -54,20 +53,24 @@ export async function createInterviewAssistant(projectId: number) {
         model: "gpt-4o",
         temperature: 0.7,
       },
-      systemPrompt: assistantPrompt,
+      // The prompt should be sent as instructions property
+      instructions: assistantPrompt,
     });
 
     // For voice calls we need to create a Vapi call
     const call = await vapiClient.calls.create({
-      assistantId: assistant.assistantId,
-      metadata: {
-        projectId: projectId.toString(),
+      assistant_id: assistant.id, // Use assistant.id instead of assistantId
+      options: {
+        // Add metadata as part of options
+        metadata: {
+          projectId: projectId.toString(),
+        }
       }
     });
 
     return { 
-      callId: call.callId,
-      assistantId: assistant.assistantId
+      callId: call.id, // Use call.id instead of callId
+      assistantId: assistant.id // Use assistant.id instead of assistantId
     };
   } catch (error) {
     console.error("Error creating Vapi interview assistant:", error);
