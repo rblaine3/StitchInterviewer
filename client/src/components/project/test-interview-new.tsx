@@ -50,8 +50,9 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       return response.json();
     },
     onSuccess: (data) => {
-      // Start the interview with Vapi
-      startInterview(data.callId);
+      // Start the interview with Vapi using the assistant ID
+      console.log("Server returned assistantId:", data.assistantId);
+      startInterview(data.assistantId);
     },
     onError: (error: Error) => {
       setIsCreatingCall(false);

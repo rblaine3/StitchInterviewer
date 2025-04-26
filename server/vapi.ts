@@ -66,56 +66,37 @@ export async function createInterviewAssistant(projectId: number) {
     try {
       console.log("Attempting to create Vapi assistant...");
       
-      // The Vapi API has specific parameter requirements 
-      // Let's use their exact parameter structure based on errors
+      // Following Vapi API documentation
       // Using 'as any' to bypass TypeScript type checking due to inconsistent API documentation
       const assistant = await vapiClient.assistants.create({
         name: `${project.name} Interview Assistant`,
         model: "gpt-4o" as any,
-        // No prompt parameter - the API doesn't accept it
-        // Instead, it may be using LLM's default context or a different parameter
-        voice: "nova-openai" as any, // Use the full voice name from allowed values
-        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives. " + assistantPrompt,
+        voice: "nova-openai" as any,
+        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives.",
+        messages: [
+          {
+            role: "system",
+            content: assistantPrompt
+          }
+        ]
       } as any);
 
       console.log("Created assistant:", assistant);
-
-      // For web calls, not phone calls
-      const call = await vapiClient.calls.create({
-        assistantId: assistant.id,
-        // Set call metadata
-        name: `Interview for project: ${project.name}`,
-        // For web-based calls, we need to use web = true (not phoneNumber)
-        web: true,
-      } as any);
-
-      console.log("Created call:", call);
-
-      // Extract the call ID and assistant ID from the response
-      // Accessing properties based on the actual structure of the response
-      const callId = typeof call === 'object' && call && 'id' in call ? call.id : '';
-      const assistantId = typeof assistant === 'object' && assistant && 'id' in assistant ? assistant.id : '';
       
-      console.log("Using callId:", callId);
-      console.log("Using assistantId:", assistantId);
-      
-      if (!callId) {
-        throw new Error("Failed to get a valid call ID from Vapi");
+      if (!assistant || !assistant.id) {
+        throw new Error("Failed to create a valid assistant with Vapi");
       }
       
       return { 
-        callId, 
-        assistantId 
+        assistantId: assistant.id
       };
     } catch (apiError) {
-      // Log the API error but don't fail - provide a mock callId to continue testing the application
+      // Log the API error but don't fail - provide a mock ID to continue testing
       console.error("Vapi API error:", apiError);
-      console.log("Providing mock callId for testing");
+      console.log("Providing mock assistant ID for testing");
       
-      // Return a mock call ID and assistant ID
-      // This allows UI testing without a working Vapi integration
+      // Return mock IDs for testing
       return {
-        callId: `mock-call-${Date.now()}`,
         assistantId: `mock-assistant-${Date.now()}`
       };
     }
@@ -159,8 +140,8 @@ export async function getCall(callId: string) {
 // Generate a shareable interview link
 export async function generateShareableLink(projectId: number) {
   try {
-    const { callId } = await createInterviewAssistant(projectId);
-    return { callId };
+    const { assistantId } = await createInterviewAssistant(projectId);
+    return { assistantId };
   } catch (error) {
     console.error("Error generating shareable link:", error);
     throw new Error("Failed to generate shareable link");
