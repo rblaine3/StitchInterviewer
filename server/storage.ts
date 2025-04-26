@@ -1,4 +1,8 @@
-import { users, type User, type InsertUser, projects, type Project, type InsertProject } from "@shared/schema";
+import { 
+  users, type User, type InsertUser, 
+  projects, type Project, type InsertProject, type UpdateProject,
+  researchMaterials, type ResearchMaterial, type InsertResearchMaterial
+} from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 
@@ -13,8 +17,17 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   getProjects(userId: number): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
-  updateProject(id: number, project: Partial<InsertProject>): Promise<Project | undefined>;
+  updateProject(id: number, project: Partial<UpdateProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
+  
+  // Research Material methods
+  createResearchMaterial(material: InsertResearchMaterial): Promise<ResearchMaterial>;
+  getResearchMaterials(projectId: number): Promise<ResearchMaterial[]>;
+  deleteResearchMaterial(id: number): Promise<boolean>;
+  
+  // Research Objective and Prompt methods
+  updateResearchObjective(projectId: number, objective: string): Promise<Project | undefined>;
+  updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined>;
   
   sessionStore: session.SessionStore;
 }
@@ -22,15 +35,19 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private projects: Map<number, Project>;
+  private researchMaterials: Map<number, ResearchMaterial>;
   currentUserId: number;
   currentProjectId: number;
+  currentResearchMaterialId: number;
   sessionStore: session.SessionStore;
 
   constructor() {
     this.users = new Map();
     this.projects = new Map();
+    this.researchMaterials = new Map();
     this.currentUserId = 1;
     this.currentProjectId = 1;
+    this.currentResearchMaterialId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
@@ -56,7 +73,13 @@ export class MemStorage implements IStorage {
   async createProject(insertProject: InsertProject): Promise<Project> {
     const id = this.currentProjectId++;
     const now = new Date();
-    const project: Project = { ...insertProject, id, createdAt: now };
+    const project: Project = { 
+      ...insertProject, 
+      id, 
+      createdAt: now,
+      researchObjective: null,
+      interviewPrompt: null
+    };
     this.projects.set(id, project);
     return project;
   }
@@ -71,7 +94,7 @@ export class MemStorage implements IStorage {
     return this.projects.get(id);
   }
 
-  async updateProject(id: number, projectData: Partial<InsertProject>): Promise<Project | undefined> {
+  async updateProject(id: number, projectData: Partial<UpdateProject>): Promise<Project | undefined> {
     const project = this.projects.get(id);
     if (!project) return undefined;
 
@@ -81,7 +104,47 @@ export class MemStorage implements IStorage {
   }
 
   async deleteProject(id: number): Promise<boolean> {
+    // Delete all research materials associated with the project
+    const materialsToDelete = Array.from(this.researchMaterials.values())
+      .filter(material => material.projectId === id)
+      .map(material => material.id);
+    
+    materialsToDelete.forEach(materialId => {
+      this.researchMaterials.delete(materialId);
+    });
+    
     return this.projects.delete(id);
+  }
+  
+  // Research Material methods
+  async createResearchMaterial(material: InsertResearchMaterial): Promise<ResearchMaterial> {
+    const id = this.currentResearchMaterialId++;
+    const now = new Date();
+    const researchMaterial: ResearchMaterial = {
+      ...material,
+      id,
+      uploadedAt: now,
+    };
+    this.researchMaterials.set(id, researchMaterial);
+    return researchMaterial;
+  }
+  
+  async getResearchMaterials(projectId: number): Promise<ResearchMaterial[]> {
+    return Array.from(this.researchMaterials.values())
+      .filter(material => material.projectId === projectId);
+  }
+  
+  async deleteResearchMaterial(id: number): Promise<boolean> {
+    return this.researchMaterials.delete(id);
+  }
+  
+  // Research Objective and Prompt methods
+  async updateResearchObjective(projectId: number, objective: string): Promise<Project | undefined> {
+    return this.updateProject(projectId, { researchObjective: objective });
+  }
+  
+  async updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined> {
+    return this.updateProject(projectId, { interviewPrompt: prompt });
   }
 }
 

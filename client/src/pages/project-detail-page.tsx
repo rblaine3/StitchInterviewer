@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectModal from "@/components/project/project-modal";
 import DeleteProjectDialog from "@/components/project/delete-project-dialog";
+import ResearchPlan from "@/components/project/research-plan";
 import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Edit, Trash, Loader2, Code, BellIcon, User, LogOut } from "lucide-react";
 import { 
@@ -173,15 +174,7 @@ export default function ProjectDetailPage() {
             
             {/* Tab contents */}
             <TabsContent value="research-plan" className="py-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Research Plan</CardTitle>
-                  <CardDescription>Plan your research goals and approach.</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center py-12 text-gray-500">
-                  Research Plan content will be implemented in future updates.
-                </CardContent>
-              </Card>
+              {project && <ResearchPlan projectId={project.id} />}
             </TabsContent>
             
             <TabsContent value="test-interview" className="py-6">
