@@ -10,10 +10,8 @@ import Vapi from "@vapi-ai/web";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// For debugging - we'll access the API key from the server
-// This should come from environment variables in production
-const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
-console.log("Frontend has Vapi API key access:", !!VAPI_API_KEY);
+// Debug line to check for API key in environment variables
+console.log("Frontend environment variables:", Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
 
 interface TestInterviewProps {
   project: Project; // Pass the entire project object
@@ -28,6 +26,27 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0);
   const [isCreatingCall, setIsCreatingCall] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  
+  // Fetch the API key from the server
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch('/api/config/vapi-key');
+        if (response.ok) {
+          const data = await response.json();
+          setApiKey(data.apiKey);
+          console.log("Successfully retrieved Vapi API key from server");
+        } else {
+          console.error("Failed to retrieve Vapi API key from server");
+        }
+      } catch (error) {
+        console.error("Error fetching Vapi API key:", error);
+      }
+    };
+    
+    fetchApiKey();
+  }, []);
   
   // For storing transcript
   type MessageType = 'assistant' | 'user';
@@ -178,17 +197,18 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       }
       
       // Real Vapi implementation - per Vapi Web SDK docs
-      const apiKey = import.meta.env.VITE_VAPI_API_KEY || "";
+      // Use the API key fetched from the server
       if (!apiKey) {
-        console.error("Missing VITE_VAPI_API_KEY environment variable!");
+        console.error("Missing Vapi API key from server!");
         toast({
           title: "Missing API Key",
-          description: "The Vapi API key is missing. Please check your environment configuration.",
+          description: "The Vapi API key could not be retrieved from the server. Please try again later.",
           variant: "destructive",
         });
         setIsCreatingCall(false);
         return;
       }
+      console.log("Using server-provided Vapi API key");
       
       console.log("Creating Vapi instance with API key");
       

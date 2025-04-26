@@ -402,6 +402,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch assistant details" });
     }
   });
+  
+  // Get API keys for the frontend (secured - requires authentication)
+  app.get("/api/config/vapi-key", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const apiKey = process.env.VAPI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "Vapi API key not configured" });
+    }
+    
+    res.json({ apiKey });
+  });
 
   // Generate a shareable interview link
   app.post("/api/projects/:id/share", async (req: Request, res: Response) => {

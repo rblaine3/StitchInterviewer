@@ -5,9 +5,8 @@ import { Loader2, Mic, Volume2, Volume, UserRound, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Vapi from "@vapi-ai/web";
 
-// For debugging - we'll access the API key from the server
-const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
-console.log("Frontend has Vapi API key access in shared page:", !!VAPI_API_KEY);
+// We'll fetch the API key from a secure endpoint
+console.log("Initializing shared interview page");
 
 export default function SharedInterviewPage() {
   const { assistantId } = useParams<{ assistantId: string }>();
@@ -18,6 +17,29 @@ export default function SharedInterviewPage() {
   const [volume, setVolume] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  
+  // Fetch the API key when component mounts
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch('/api/config/vapi-key');
+        if (response.ok) {
+          const data = await response.json();
+          setApiKey(data.apiKey);
+          console.log("Successfully retrieved Vapi API key from server");
+        } else {
+          console.error("Failed to retrieve Vapi API key from server");
+          setError("Failed to retrieve API configuration");
+        }
+      } catch (error) {
+        console.error("Error fetching Vapi API key:", error);
+        setError("Failed to retrieve API configuration");
+      }
+    };
+    
+    fetchApiKey();
+  }, []);
 
   // Initialize Vapi when the component mounts
   useEffect(() => {
