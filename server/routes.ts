@@ -409,9 +409,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Authentication required" });
     }
     
-    const apiKey = process.env.VAPI_API_KEY;
+    // Use the public key for frontend use (not the private key)
+    // The Web SDK requires the public key as per Vapi documentation
+    const apiKey = process.env.VAPI_PUBLIC_KEY;
     if (!apiKey) {
-      return res.status(500).json({ message: "Vapi API key not configured" });
+      console.error("VAPI_PUBLIC_KEY not configured in environment");
+      return res.status(500).json({ message: "Vapi public key not configured" });
     }
     
     res.json({ apiKey });

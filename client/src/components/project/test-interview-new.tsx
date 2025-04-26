@@ -88,6 +88,18 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     try {
       console.log("Starting interview with assistant ID:", assistantId);
       
+      // If we don't have an API key yet, wait for it
+      if (!apiKey) {
+        console.log("Waiting for API key to be fetched from server...");
+        toast({
+          title: "Loading API configuration",
+          description: "Please wait while we prepare the interview session...",
+        });
+        // We'll set this flag to false so the user can try again
+        setIsCreatingCall(false);
+        return;
+      }
+      
       // Check if we're using a mock assistant ID (for testing without Vapi API)
       if (assistantId.startsWith('mock-assistant-')) {
         console.log("Using mock interface for testing");
@@ -212,7 +224,8 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       
       console.log("Creating Vapi instance with API key");
       
-      // Create a new Vapi instance with just the API key (per docs)
+      // Create a new Vapi instance with the API key from the server
+      console.log("Creating Vapi instance with server-provided API key");
       const vapi = new Vapi(apiKey);
 
       // Set up event listeners for volume levels

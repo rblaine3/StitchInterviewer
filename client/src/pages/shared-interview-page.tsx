@@ -41,12 +41,17 @@ export default function SharedInterviewPage() {
     fetchApiKey();
   }, []);
 
-  // Initialize Vapi when the component mounts
+  // Initialize Vapi only when we have both the API key and assistantId
   useEffect(() => {
     if (!assistantId) {
       setError("Invalid interview link");
       setIsLoading(false);
       return;
+    }
+    
+    // Don't start the interview until we have the API key
+    if (!apiKey) {
+      return; // We'll wait for the API key to be fetched
     }
 
     const startInterview = async () => {
@@ -114,14 +119,15 @@ export default function SharedInterviewPage() {
           return;
         }
 
-        // Get API key from environment
-        const apiKey = import.meta.env.VITE_VAPI_API_KEY || "";
+        // Wait for API key to be fetched from server
         if (!apiKey) {
-          console.error("Missing VITE_VAPI_API_KEY environment variable!");
+          console.error("Missing Vapi API key from server!");
           throw new Error("Missing API key configuration");
         }
+        console.log("Using server-provided Vapi API key for shared interview");
         
-        // Initialize Vapi with API key according to SDK docs
+        // Initialize Vapi with API key from server
+        console.log("Creating Vapi instance with server-provided API key for shared interview");
         const vapi = new Vapi(apiKey);
         
         // Set up event listeners for all possible events
@@ -199,7 +205,7 @@ export default function SharedInterviewPage() {
         clearInterval(volumeInterval);
       }
     };
-  }, [assistantId, toast]);
+  }, [assistantId, apiKey, toast]);
 
   // Toggle mute
   const toggleMute = () => {

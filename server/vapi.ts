@@ -66,6 +66,13 @@ export async function createInterviewAssistant(projectId: number) {
     try {
       console.log("Attempting to create Vapi assistant...");
       
+      // Log authentication information for debugging (masked)
+      if (apiKey) {
+        console.log(`Using API key for Vapi (${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length-4)})`);
+      } else {
+        console.log("WARNING: No API key available for Vapi");
+      }
+      
       // Following Vapi API documentation
       // Using 'as any' to bypass TypeScript type checking due to inconsistent API documentation
       // Following Vapi API documentation for assistant creation
