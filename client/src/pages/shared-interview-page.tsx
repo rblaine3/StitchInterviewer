@@ -5,8 +5,12 @@ import { Loader2, Mic, Volume2, Volume, UserRound, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Vapi from "@vapi-ai/web";
 
+// For debugging - we'll access the API key from the server
+const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
+console.log("Frontend has Vapi API key access in shared page:", !!VAPI_API_KEY);
+
 export default function SharedInterviewPage() {
-  const { callId } = useParams<{ callId: string }>();
+  const { assistantId } = useParams<{ assistantId: string }>();
   const { toast } = useToast();
   const [isInterviewActive, setIsInterviewActive] = useState(false);
   const [vapiInstance, setVapiInstance] = useState<Vapi | null>(null);
@@ -17,7 +21,7 @@ export default function SharedInterviewPage() {
 
   // Initialize Vapi when the component mounts
   useEffect(() => {
-    if (!callId) {
+    if (!assistantId) {
       setError("Invalid interview link");
       setIsLoading(false);
       return;
@@ -26,14 +30,9 @@ export default function SharedInterviewPage() {
     const startInterview = async () => {
       try {
         setIsLoading(true);
-        // Fetch call details to verify the call exists
-        const response = await fetch(`/api/calls/${callId}`);
-        if (!response.ok) {
-          throw new Error("Interview not found or has expired");
-        }
 
-        // Check if we're using a mock call ID (for testing without Vapi API)
-        if (callId.startsWith('mock-call-')) {
+        // Check if we're using a mock assistant ID (for testing without Vapi API)
+        if (assistantId.startsWith('mock-assistant-')) {
           console.log("Using mock interface for shared interview");
           
           // Create a mock interface for testing
@@ -87,25 +86,59 @@ export default function SharedInterviewPage() {
           return;
         }
 
-        // Initialize Vapi with the callId directly
-        // Pass an empty API key as the first parameter and the callId as the second parameter
-        const vapi = new Vapi("", callId);
+        // Get API key from environment
+        const apiKey = import.meta.env.VITE_VAPI_API_KEY || "";
+        if (!apiKey) {
+          console.error("Missing VITE_VAPI_API_KEY environment variable!");
+          throw new Error("Missing API key configuration");
+        }
         
-        // Set up event listeners
-        vapi.on("volume-level", (level) => {
+        // Initialize Vapi with API key according to SDK docs
+        const vapi = new Vapi(apiKey);
+        
+        // Set up event listeners for all possible events
+        vapi.on("volume-level", (level: number) => {
           setVolume(level);
         });
 
+        vapi.on("call-start", () => {
+          console.log("Interview call started");
+          setIsInterviewActive(true);
+        });
+
         vapi.on("call-end", () => {
+          console.log("Interview call ended");
           setIsInterviewActive(false);
         });
 
-        // Start the call
-        await vapi.start();
+        vapi.on("speech-start", () => {
+          console.log("Assistant started speaking");
+        });
+
+        vapi.on("speech-end", () => {
+          console.log("Assistant stopped speaking");
+        });
+
+        vapi.on("message", (message: any) => {
+          console.log("Message received:", message);
+        });
+
+        vapi.on("error", (error: Error) => {
+          console.error("Vapi error:", error);
+          toast({
+            title: "Interview error",
+            description: "There was an error during the interview. Please try again.",
+            variant: "destructive",
+          });
+        });
+
+        // Start the call with the assistant ID (not the call ID)
+        console.log("Starting Vapi call with assistantId:", assistantId);
+        const call = await vapi.start(assistantId);
+        console.log("Vapi call started successfully:", call);
         
         // Update state
         setVapiInstance(vapi);
-        setIsInterviewActive(true);
         setIsLoading(false);
       } catch (error) {
         console.error("Error starting interview:", error);
@@ -138,7 +171,7 @@ export default function SharedInterviewPage() {
         clearInterval(volumeInterval);
       }
     };
-  }, [callId]);
+  }, [assistantId, toast]);
 
   // Toggle mute
   const toggleMute = () => {
