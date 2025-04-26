@@ -80,12 +80,14 @@ export async function createInterviewAssistant(projectId: number) {
 
       console.log("Created assistant:", assistant);
 
-      // For voice calls we need to create a Vapi call
+      // For web calls, not phone calls
       const call = await vapiClient.calls.create({
         assistantId: assistant.id,
         // Set call metadata
         name: `Interview for project: ${project.name}`,
-      });
+        // For web-based calls, we need to use web = true (not phoneNumber)
+        web: true,
+      } as any);
 
       console.log("Created call:", call);
 

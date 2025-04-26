@@ -172,8 +172,15 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       }
       
       // Real Vapi implementation for when we have a working API connection
-      // Create a new Vapi instance with the call ID
-      const vapi = new Vapi("", callId);
+      // Get the API key from environment variables for client-side use
+      const apiKey = import.meta.env.VITE_VAPI_API_KEY || "";
+      if (!apiKey) {
+        console.error("Missing VITE_VAPI_API_KEY environment variable!");
+      }
+      console.log("Creating real Vapi instance with call ID:", callId);
+      
+      // Create a new Vapi instance with the API key and call ID
+      const vapi = new Vapi(apiKey, callId);
 
       // Set up event listeners for volume levels
       vapi.on("volume-level", (level: number) => {
@@ -187,6 +194,22 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
         setIsCreatingCall(false);
       });
 
+      // Set up event listeners for transcript updates
+      vapi.on("transcript", (transcript: any) => {
+        console.log("Transcript received:", transcript);
+        
+        // Add to transcript display
+        if (transcript && transcript.text) {
+          const messageType = transcript.role === 'assistant' ? 'assistant' : 'user';
+          setTranscript(prev => [...prev, {
+            id: `transcript-${Date.now()}`,
+            type: messageType,
+            text: transcript.text,
+            timestamp: new Date()
+          }]);
+        }
+      });
+      
       // Set up event listeners for errors
       vapi.on("error", (error: Error) => {
         console.error("Vapi error:", error);
