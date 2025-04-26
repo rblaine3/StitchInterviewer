@@ -51,9 +51,62 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     try {
       console.log("Starting interview with call ID:", callId);
       
+      // Check if we're using a mock call ID (for testing without Vapi API)
+      if (callId.startsWith('mock-call-')) {
+        console.log("Using mock interface for testing");
+        // Create a mock interface for testing
+        const mockVapi = {
+          // Mock methods for Vapi
+          stop: () => {
+            console.log("Mock Vapi stop called");
+            // Clear volume interval on stop
+            if (mockVapi.mockVolumeInterval) {
+              clearInterval(mockVapi.mockVolumeInterval);
+            }
+          },
+          setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
+          start: async () => console.log("Mock Vapi start called"),
+          on: (event: string, callback: Function) => {
+            console.log(`Mock Vapi registered listener for ${event}`);
+            // Simulate volume changes
+            if (event === 'volume-level' && callback) {
+              // Start a volume simulation interval
+              const interval = setInterval(() => {
+                const randomVolume = Math.random() * 0.5;
+                callback(randomVolume);
+              }, 1000);
+              
+              // Store the interval ID for cleanup
+              // @ts-ignore - adding custom property to mock object
+              mockVapi.mockVolumeInterval = interval;
+              return interval;
+            }
+            return null;
+          },
+          // Property to store volume interval for cleanup
+          mockVolumeInterval: null as number | null
+        };
+        
+        // Simulate volume levels
+        mockVapi.on('volume-level', (level: number) => {
+          setVolume(level);
+        });
+        
+        // Simulate call initiation
+        await mockVapi.start();
+        console.log("Mock Vapi call started successfully");
+        
+        // Save the mock instance to state
+        // @ts-ignore - we're using a mock object that mimics Vapi functionality
+        setVapiInstance(mockVapi);
+        setIsInterviewActive(true);
+        setIsCreatingCall(false);
+        
+        return;
+      }
+      
+      // Real Vapi implementation for when we have a working API connection
       // Create a new Vapi instance with the call ID
-      // Note: We don't need to pass an API key here since the backend creates the call
-      // The client-side Vapi instance just needs the callId
       const vapi = new Vapi("", callId);
 
       // Set up event listeners for volume levels
@@ -117,9 +170,27 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
 
   // Clean up on unmount
   useEffect(() => {
+    // Store the volume update interval
+    let volumeInterval: number | null = null;
+    
+    if (vapiInstance) {
+      // For mock implementations, the on() function returns an interval ID
+      // @ts-ignore - handling mock implementation
+      if (vapiInstance.mockVolumeInterval) {
+        // @ts-ignore - handling mock implementation
+        volumeInterval = vapiInstance.mockVolumeInterval;
+      }
+    }
+    
     return () => {
+      // Clean up Vapi instance
       if (vapiInstance) {
         vapiInstance.stop();
+      }
+      
+      // Clear any intervals (for mock implementation)
+      if (volumeInterval) {
+        clearInterval(volumeInterval);
       }
     };
   }, [vapiInstance]);

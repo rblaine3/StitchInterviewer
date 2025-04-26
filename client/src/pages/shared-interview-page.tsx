@@ -32,6 +32,61 @@ export default function SharedInterviewPage() {
           throw new Error("Interview not found or has expired");
         }
 
+        // Check if we're using a mock call ID (for testing without Vapi API)
+        if (callId.startsWith('mock-call-')) {
+          console.log("Using mock interface for shared interview");
+          
+          // Create a mock interface for testing
+          const mockVapi = {
+            // Mock methods for Vapi
+            stop: () => {
+              console.log("Mock Vapi stop called");
+              // Clear volume interval on stop
+              if (mockVapi.mockVolumeInterval) {
+                clearInterval(mockVapi.mockVolumeInterval);
+              }
+            },
+            setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
+            start: async () => console.log("Mock Vapi start called"),
+            on: (event: string, callback: Function) => {
+              console.log(`Mock Vapi registered listener for ${event}`);
+              // Simulate volume changes
+              if (event === 'volume-level' && callback) {
+                // Start a volume simulation interval
+                const interval = setInterval(() => {
+                  const randomVolume = Math.random() * 0.5;
+                  callback(randomVolume);
+                }, 1000);
+                
+                // Store the interval ID for cleanup
+                // @ts-ignore - adding custom property to mock object
+                mockVapi.mockVolumeInterval = interval;
+                return interval;
+              }
+              return null;
+            },
+            // Property to store volume interval for cleanup
+            mockVolumeInterval: null as number | null
+          };
+          
+          // Simulate volume levels
+          mockVapi.on('volume-level', (level: number) => {
+            setVolume(level);
+          });
+          
+          // Simulate call initiation
+          await mockVapi.start();
+          console.log("Mock Vapi call started successfully");
+          
+          // Save the mock instance to state
+          // @ts-ignore - we're using a mock object that mimics Vapi functionality
+          setVapiInstance(mockVapi);
+          setIsInterviewActive(true);
+          setIsLoading(false);
+          
+          return;
+        }
+
         // Initialize Vapi with the callId directly
         // Pass an empty API key as the first parameter and the callId as the second parameter
         const vapi = new Vapi("", callId);
@@ -63,8 +118,24 @@ export default function SharedInterviewPage() {
 
     // Cleanup on unmount
     return () => {
+      // Store the volume update interval
+      let volumeInterval: number | null = null;
+      
       if (vapiInstance) {
+        // For mock implementations, the on() function returns an interval ID
+        // @ts-ignore - handling mock implementation
+        if (vapiInstance.mockVolumeInterval) {
+          // @ts-ignore - handling mock implementation
+          volumeInterval = vapiInstance.mockVolumeInterval;
+        }
+        
+        // Stop the Vapi instance
         vapiInstance.stop();
+      }
+      
+      // Clear any intervals (for mock implementation)
+      if (volumeInterval) {
+        clearInterval(volumeInterval);
       }
     };
   }, [callId]);
