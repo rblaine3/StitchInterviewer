@@ -10,6 +10,11 @@ import Vapi from "@vapi-ai/web";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// For debugging - we'll access the API key from the server
+// This should come from environment variables in production
+const VAPI_API_KEY = import.meta.env.VITE_VAPI_API_KEY;
+console.log("Frontend has Vapi API key access:", !!VAPI_API_KEY);
+
 interface TestInterviewProps {
   project: Project; // Pass the entire project object
 }
@@ -195,16 +200,16 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       });
 
       // Set up event listeners for transcript updates
-      vapi.on("transcript", (transcript: any) => {
-        console.log("Transcript received:", transcript);
+      vapi.on("transcription", (transcriptData: any) => {
+        console.log("Transcript received:", transcriptData);
         
         // Add to transcript display
-        if (transcript && transcript.text) {
-          const messageType = transcript.role === 'assistant' ? 'assistant' : 'user';
+        if (transcriptData && transcriptData.text) {
+          const messageType = transcriptData.role === 'assistant' ? 'assistant' : 'user';
           setTranscript(prev => [...prev, {
             id: `transcript-${Date.now()}`,
             type: messageType,
-            text: transcript.text,
+            text: transcriptData.text,
             timestamp: new Date()
           }]);
         }
