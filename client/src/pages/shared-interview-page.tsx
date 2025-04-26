@@ -30,7 +30,13 @@ export default function SharedInterviewPage() {
     const startInterview = async () => {
       try {
         setIsLoading(true);
-
+        
+        // Fetch assistant details to verify the assistant exists
+        const response = await fetch(`/api/assistants/${assistantId}`);
+        if (!response.ok) {
+          throw new Error("Interview not found or has expired");
+        }
+        
         // Check if we're using a mock assistant ID (for testing without Vapi API)
         if (assistantId.startsWith('mock-assistant-')) {
           console.log("Using mock interface for shared interview");

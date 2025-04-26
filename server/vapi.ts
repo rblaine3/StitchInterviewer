@@ -68,17 +68,20 @@ export async function createInterviewAssistant(projectId: number) {
       
       // Following Vapi API documentation
       // Using 'as any' to bypass TypeScript type checking due to inconsistent API documentation
+      // Following Vapi API documentation for assistant creation
+      // Remove the 'messages' property that's causing the error
       const assistant = await vapiClient.assistants.create({
         name: `${project.name} Interview Assistant`,
-        model: "gpt-4o" as any,
-        voice: "nova-openai" as any,
-        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives.",
-        messages: [
-          {
-            role: "system",
-            content: assistantPrompt
-          }
-        ]
+        model: {
+          provider: "openai",
+          model: "gpt-4o",
+          systemPrompt: assistantPrompt
+        },
+        voice: {
+          provider: "openai",
+          voiceId: "nova"
+        },
+        firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives."
       } as any);
 
       console.log("Created assistant:", assistant);
@@ -106,32 +109,32 @@ export async function createInterviewAssistant(projectId: number) {
   }
 }
 
-// Get call details
-export async function getCall(callId: string) {
+// Get assistant details
+export async function getAssistant(assistantId: string) {
   try {
-    // Check for mock call IDs
-    if (callId.startsWith('mock-call-')) {
-      console.log("Using mock call data for", callId);
+    // Check for mock assistant IDs
+    if (assistantId.startsWith('mock-assistant-')) {
+      console.log("Using mock assistant data for", assistantId);
       // Return mock data for testing
       return {
-        id: callId,
+        id: assistantId,
         status: "active",
         metadata: { test: true },
         createdAt: new Date().toISOString()
       };
     }
     
-    // Otherwise try to get the actual call from Vapi
-    const call = await vapiClient.calls.get(callId);
-    return call;
+    // Otherwise try to get the actual assistant from Vapi
+    const assistant = await vapiClient.assistants.get(assistantId);
+    return assistant;
   } catch (error) {
-    console.error("Error getting call:", error);
+    console.error("Error getting assistant:", error);
     
     // Return mock data instead of failing
     return {
-      id: callId,
+      id: assistantId,
       status: "active",
-      metadata: { test: true, error: "Unable to fetch real call data" },
+      metadata: { test: true, error: "Unable to fetch real assistant data" },
       createdAt: new Date().toISOString()
     };
   }

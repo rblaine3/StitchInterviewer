@@ -9,7 +9,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { enhancePrompt } from "./openai";
-import { createInterviewAssistant, getCall, generateShareableLink } from "./vapi";
+import { createInterviewAssistant, getAssistant, generateShareableLink } from "./vapi";
 
 // Setup multer for file uploads
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -391,15 +391,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get call details (for both test interview and shared interviews)
-  app.get("/api/calls/:callId", async (req: Request, res: Response) => {
+  // Get assistant details (for both test interview and shared interviews)
+  app.get("/api/assistants/:assistantId", async (req: Request, res: Response) => {
     try {
-      const { callId } = req.params;
-      const call = await getCall(callId);
-      res.json(call);
+      const { assistantId } = req.params;
+      const assistant = await getAssistant(assistantId);
+      res.json(assistant);
     } catch (error) {
-      console.error("Error fetching call:", error);
-      res.status(500).json({ message: "Failed to fetch call details" });
+      console.error("Error fetching assistant:", error);
+      res.status(500).json({ message: "Failed to fetch assistant details" });
     }
   });
 
