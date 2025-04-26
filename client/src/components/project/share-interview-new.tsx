@@ -30,9 +30,9 @@ export default function ShareInterviewNew({ project }: ShareInterviewProps) {
       return response.json();
     },
     onSuccess: (data) => {
-      // Create a complete URL with the callId
+      // Create a complete URL with the assistantId
       const baseUrl = window.location.origin;
-      const shareUrl = `${baseUrl}/interview/${data.callId}`;
+      const shareUrl = `${baseUrl}/interview/${data.assistantId}`;
       setShareableLink(shareUrl);
       toast({
         title: "Shareable link generated",

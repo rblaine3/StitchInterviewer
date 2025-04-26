@@ -49,18 +49,45 @@ export async function createInterviewAssistant(projectId: number) {
       }
     }
 
-    // Construct the assistant prompt
-    let assistantPrompt = project.interviewPrompt || "You are an interviewer. Ask questions to understand the user better.";
-    
-    // If we have research objective but no interview prompt, use the objective
-    if (!project.interviewPrompt && project.researchObjective) {
-      assistantPrompt = `You are a user researcher conducting an interview. Your research objective is: ${project.researchObjective}. 
-      Ask open-ended questions to understand the user's perspective on this topic.`;
+    // Construct the assistant prompt with a more structured approach
+    let assistantPrompt = `## Identity
+You are an experienced interviewer conducting user research.
+
+## Style
+Speak in a conversational, friendly tone. Use simple language and avoid jargon to ensure clarity.
+
+## Response Guidelines
+Keep responses concise. Ask one question at a time and allow for pauses to let the interviewee reflect and respond.
+
+## Interview Plan
+Structure your interview to cover these key areas:
+1. Introduction - Start with a brief introduction and a warm-up question
+2. Main questions - Explore the research objective in depth
+3. Follow-ups - Dig deeper based on the interviewee's responses
+4. Conclusion - Summarize key insights and thank the participant
+
+## Research Objective
+${project.researchObjective || "Understand the user's perspective, challenges, and ideas for improvement."}`;
+
+    // If user has added a custom interview prompt, use it as guidance
+    if (project.interviewPrompt) {
+      assistantPrompt += `\n\n## Custom Interview Guidance
+${project.interviewPrompt}`;
     }
 
-    // If we have additional context from research materials, add it
+    // If we have additional context from research materials, add it with specific instructions on how to use it
     if (contextContent) {
-      assistantPrompt += `\n\nAdditional context from research materials:${contextContent}\n\nUse this context to inform your questions, but do not directly reference these documents to the user.`;
+      assistantPrompt += `\n\n## Knowledge Base
+The following information has been provided as research context. Incorporate relevant insights from these materials into your questions, but do not directly reference these documents to the interviewee:
+
+${contextContent}
+
+## IMPORTANT INSTRUCTIONS FOR USING KNOWLEDGE BASE:
+1. Directly reference topics, ideas, and concepts from the knowledge base
+2. Use terminology consistent with the knowledge base materials
+3. When appropriate, verify information from the knowledge base with the interviewee
+4. Identify gaps between the knowledge base and the interviewee's experience
+5. Use the knowledge base to formulate follow-up questions`;
     }
 
     try {
