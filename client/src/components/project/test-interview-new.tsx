@@ -65,12 +65,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
   });
 
   // Initialize the Vapi client when the interview is started
-  const startInterview = async (callId: string) => {
+  const startInterview = async (assistantId: string) => {
     try {
-      console.log("Starting interview with call ID:", callId);
+      console.log("Starting interview with assistant ID:", assistantId);
       
-      // Check if we're using a mock call ID (for testing without Vapi API)
-      if (callId.startsWith('mock-call-')) {
+      // Check if we're using a mock assistant ID (for testing without Vapi API)
+      if (assistantId.startsWith('mock-assistant-')) {
         console.log("Using mock interface for testing");
         // Mock interview script for simulating a conversation
         const mockScript = [
@@ -177,40 +177,62 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
         return;
       }
       
-      // Real Vapi implementation for when we have a working API connection
-      // Get the API key from environment variables for client-side use
+      // Real Vapi implementation - per Vapi Web SDK docs
       const apiKey = import.meta.env.VITE_VAPI_API_KEY || "";
       if (!apiKey) {
         console.error("Missing VITE_VAPI_API_KEY environment variable!");
+        toast({
+          title: "Missing API Key",
+          description: "The Vapi API key is missing. Please check your environment configuration.",
+          variant: "destructive",
+        });
+        setIsCreatingCall(false);
+        return;
       }
-      console.log("Creating real Vapi instance with call ID:", callId);
       
-      // Create a new Vapi instance with the API key and call ID
-      const vapi = new Vapi(apiKey, callId);
+      console.log("Creating Vapi instance with API key");
+      
+      // Create a new Vapi instance with just the API key (per docs)
+      const vapi = new Vapi(apiKey);
 
       // Set up event listeners for volume levels
       vapi.on("volume-level", (level: number) => {
         setVolume(level);
       });
 
+      // Set up event listeners for call start
+      vapi.on("call-start", () => {
+        console.log("Interview call started");
+        setIsInterviewActive(true);
+        setIsCreatingCall(false);
+      });
+
       // Set up event listeners for call ending
       vapi.on("call-end", () => {
         console.log("Interview call ended");
         setIsInterviewActive(false);
-        setIsCreatingCall(false);
       });
 
-      // Set up event listeners for transcript updates
-      vapi.on("transcription", (transcriptData: any) => {
-        console.log("Transcript received:", transcriptData);
+      // Set up event listeners for speech start/end
+      vapi.on("speech-start", () => {
+        console.log("Assistant started speaking");
+      });
+
+      vapi.on("speech-end", () => {
+        console.log("Assistant stopped speaking");
+      });
+
+      // Set up event listeners for messages (including transcripts)
+      vapi.on("message", (message: any) => {
+        console.log("Message received:", message);
         
-        // Add to transcript display
-        if (transcriptData && transcriptData.text) {
-          const messageType = transcriptData.role === 'assistant' ? 'assistant' : 'user';
+        // Process different message types
+        if (message.type === "transcript") {
+          // Handle transcript updates
           setTranscript(prev => [...prev, {
             id: `transcript-${Date.now()}`,
-            type: messageType,
-            text: transcriptData.text,
+            type: message.transcript.speaker === 'assistant' ? 'assistant' : 'user',
+            text: message.transcript.text || "",
             timestamp: new Date()
           }]);
         }
@@ -226,15 +248,15 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
         });
       });
 
-      console.log("Starting Vapi call");
-      // Start the call using the callId from our backend
-      await vapi.start();
-      console.log("Vapi call started successfully");
+      console.log("Starting Vapi call with assistantId:", assistantId);
+      
+      // Start the call using the assistantId from our backend
+      // This follows the Vapi Web SDK documentation pattern
+      const call = await vapi.start(assistantId);
+      console.log("Vapi call started successfully:", call);
 
       // Save the instance to state
       setVapiInstance(vapi);
-      setIsInterviewActive(true);
-      setIsCreatingCall(false);
     } catch (error) {
       console.error("Failed to start interview:", error);
       setIsCreatingCall(false);
