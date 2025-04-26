@@ -29,7 +29,7 @@ export interface IStorage {
   updateResearchObjective(projectId: number, objective: string): Promise<Project | undefined>;
   updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined>;
   
-  sessionStore: session.SessionStore;
+  sessionStore: any; // Use any for session store type
 }
 
 export class MemStorage implements IStorage {
@@ -39,7 +39,7 @@ export class MemStorage implements IStorage {
   currentUserId: number;
   currentProjectId: number;
   currentResearchMaterialId: number;
-  sessionStore: session.SessionStore;
+  sessionStore: any; // Use any type for sessionStore
 
   constructor() {
     this.users = new Map();

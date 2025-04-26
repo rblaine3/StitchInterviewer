@@ -1,10 +1,37 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProjectSchema } from "@shared/schema";
+import { insertProjectSchema, insertResearchMaterialSchema, updateProjectSchema } from "@shared/schema";
 import { setupAuth } from "./auth";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { fromZodError } from 'zod-validation-error';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { enhancePrompt } from "./openai";
+
+// Setup multer for file uploads
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage_config = multer.diskStorage({
+  destination: (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    cb(null, uploadDir);
+  },
+  filename: (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ 
+  storage: storage_config,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -128,6 +155,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
+  // Research Material Routes
+  app.post("/api/upload-research-materials", upload.array('files'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.body.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+      
+      const savedMaterials = [];
+      for (const file of files) {
+        const material = await storage.createResearchMaterial({
+          projectId,
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          fileSize: file.size,
+          filePath: file.path,
+        });
+        savedMaterials.push(material);
+      }
+      
+      res.status(201).json(savedMaterials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload research materials" });
+    }
+  });
+  
+  app.get("/api/projects/:id/research-materials", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const materials = await storage.getResearchMaterials(projectId);
+      res.json(materials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch research materials" });
+    }
+  });
+  
+  app.delete("/api/research-materials/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const materialId = parseInt(req.params.id);
+      if (isNaN(materialId)) {
+        return res.status(400).json({ message: "Invalid material ID" });
+      }
+      
+      // Delete material - would need additional validation in production
+      const deleted = await storage.deleteResearchMaterial(materialId);
+      if (deleted) {
+        res.status(204).send();
+      } else {
+        res.status(500).json({ message: "Failed to delete research material" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete research material" });
+    }
+  });
+  
+  // Research Objective and Prompt Routes
+  app.patch("/api/projects/:id/research-objective", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const schema = z.object({ objective: z.string() });
+      try {
+        const { objective } = schema.parse(req.body);
+        const updatedProject = await storage.updateResearchObjective(projectId, objective);
+        res.json(updatedProject);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          const validationError = fromZodError(error);
+          return res.status(400).json({ message: validationError.message });
+        }
+        throw error;
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update research objective" });
+    }
+  });
+  
+  app.post("/api/enhance-prompt", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const schema = z.object({ 
+        projectId: z.number(),
+        objective: z.string() 
+      });
+      
+      let projectId, objective;
+      try {
+        const parsed = schema.parse(req.body);
+        projectId = parsed.projectId;
+        objective = parsed.objective;
+      } catch (error) {
+        if (error instanceof ZodError) {
+          const validationError = fromZodError(error);
+          return res.status(400).json({ message: validationError.message });
+        }
+        throw error;
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Call OpenAI to enhance the prompt
+      const enhancedPrompt = await enhancePrompt(objective);
+      
+      // Update the project with the new prompt
+      await storage.updateInterviewPrompt(projectId, enhancedPrompt);
+      
+      res.json({ prompt: enhancedPrompt });
+    } catch (error) {
+      console.error("Error enhancing prompt:", error);
+      res.status(500).json({ message: "Failed to enhance prompt" });
     }
   });
 

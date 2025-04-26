@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, MessagesSquare, Lightbulb, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { ResearchMaterial, Project } from "@shared/schema";
+import { Upload, Trash2, Loader2, FileText, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ResearchPlanProps {
@@ -15,60 +16,139 @@ interface ResearchPlanProps {
 
 export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   const { toast } = useToast();
-  const [files, setFiles] = useState<FileList | null>(null);
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [researchObjective, setResearchObjective] = useState("");
-  const [interviewPrompt, setInterviewPrompt] = useState("");
+  const [objective, setObjective] = useState("");
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFiles(e.target.files);
-    }
-  };
+  // Fetch the current project
+  const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
+    queryKey: ["/api/projects", projectId],
+  });
 
-  // Handle file upload
-  const handleUpload = async () => {
-    if (!files || files.length === 0) {
+  // Fetch research materials for the project
+  const { data: materials, isLoading: isLoadingMaterials } = useQuery<ResearchMaterial[]>({
+    queryKey: ["/api/projects", projectId, "research-materials"],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/research-materials`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch research materials");
+      }
+      return response.json();
+    },
+  });
+
+  // Delete research material mutation
+  const deleteMaterialMutation = useMutation({
+    mutationFn: async (materialId: number) => {
+      await apiRequest("DELETE", `/api/research-materials/${materialId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "research-materials"] });
       toast({
-        title: "No files selected",
-        description: "Please select at least one file to upload",
+        title: "Material deleted",
+        description: "The material has been removed from your project",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete material",
+        description: error.message,
         variant: "destructive",
       });
-      return;
-    }
+    },
+  });
+
+  // Update research objective mutation
+  const updateObjectiveMutation = useMutation({
+    mutationFn: async (objective: string) => {
+      const response = await apiRequest("PATCH", `/api/projects/${projectId}/research-objective`, {
+        objective,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      toast({
+        title: "Research objective updated",
+        description: "Your research objective has been saved",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update objective",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Enhance prompt mutation
+  const enhancePromptMutation = useMutation({
+    mutationFn: async (objective: string) => {
+      setIsEnhancing(true);
+      const response = await apiRequest("POST", "/api/enhance-prompt", {
+        projectId,
+        objective,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      toast({
+        title: "Prompt enhanced",
+        description: "Your interview prompt has been enhanced with AI assistance",
+      });
+      setIsEnhancing(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to enhance prompt",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsEnhancing(false);
+    },
+  });
+
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
-
+    
     try {
       const formData = new FormData();
+      formData.append("projectId", projectId.toString());
+      
       for (let i = 0; i < files.length; i++) {
         formData.append("files", files[i]);
       }
-      formData.append("projectId", projectId.toString());
-
-      // This endpoint would need to be implemented on the backend
+      
       const response = await fetch("/api/upload-research-materials", {
         method: "POST",
-        body: formData,
         credentials: "include",
+        body: formData,
       });
-
+      
       if (!response.ok) {
-        throw new Error("Failed to upload files");
+        throw new Error("Upload failed");
       }
-
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "research-materials"] });
+      
       toast({
-        title: "Upload successful",
-        description: "Research materials have been uploaded",
+        title: "Files uploaded",
+        description: `Successfully uploaded ${files.length} file(s)`,
       });
-
+      
       // Reset file input
-      setFiles(null);
-      // Reset the file input element
-      const fileInput = document.getElementById("research-files") as HTMLInputElement;
-      if (fileInput) {
-        fileInput.value = "";
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     } catch (error) {
       toast({
@@ -81,160 +161,169 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
     }
   };
 
-  // Use TanStack Query mutation for the AI prompt enhancement
-  const enhancePromptMutation = useMutation({
-    mutationFn: async (objective: string) => {
-      const response = await apiRequest("POST", "/api/enhance-prompt", {
-        objective,
-        projectId,
-      });
-      if (!response.ok) {
-        throw new Error("Failed to enhance prompt");
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setInterviewPrompt(data.enhancedPrompt);
-      toast({
-        title: "Prompt enhanced",
-        description: "Your research objective has been transformed into an interview prompt",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Enhancement failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleEnhancePrompt = () => {
-    if (!researchObjective.trim()) {
-      toast({
-        title: "Research objective required",
-        description: "Please enter a research objective to enhance",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    enhancePromptMutation.mutate(researchObjective);
+  // Handle objective change
+  const handleSaveObjective = () => {
+    updateObjectiveMutation.mutate(objective);
   };
+
+  // Handle enhance prompt
+  const handleEnhancePrompt = () => {
+    enhancePromptMutation.mutate(objective || (project?.researchObjective || ""));
+  };
+
+  if (isLoadingProject) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Knowledge Base Upload Section */}
-      <Card className="shadow-sm">
+      {/* Knowledge Base Section */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center text-xl">
-            <FileText className="mr-2 h-5 w-5 text-primary" />
-            Knowledge Base
-          </CardTitle>
+          <CardTitle>Knowledge Base</CardTitle>
           <CardDescription>
-            Upload materials related to your project for context and background information
+            Upload documents, images, or any materials related to your research
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid w-full max-w-sm items-center gap-1.5">
-            <Label htmlFor="research-files">Upload Files</Label>
-            <Input
-              id="research-files"
-              type="file"
-              multiple
-              onChange={handleFileChange}
-              className="cursor-pointer"
-            />
-            <p className="text-xs text-gray-500">
-              Supported formats: PDF, DOCX, TXT, etc. (Max 10MB per file)
-            </p>
-          </div>
-
-          <Button
-            onClick={handleUpload}
-            disabled={isUploading || !files || files.length === 0}
-            className="flex items-center"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
+        <CardContent>
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div>
+              <Label htmlFor="file-upload" className="block mb-2">
                 Upload Files
-              </>
-            )}
-          </Button>
+              </Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  ref={fileInputRef}
+                  id="file-upload"
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="flex-1"
+                  disabled={isUploading}
+                />
+                <Button variant="outline" size="icon" disabled={isUploading}>
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Accepted file types: PDF, DOCX, TXT, JPG, PNG, etc. (max 10MB)
+              </p>
+            </div>
 
-          {/* File list would go here - this is a placeholder for now */}
-          <div className="mt-4">
-            <h4 className="text-sm font-medium mb-2">Uploaded Materials</h4>
-            <div className="text-sm text-gray-500 italic">
-              No materials uploaded yet
+            {/* Uploaded Files */}
+            <div className="mt-6">
+              <h3 className="font-medium mb-3">Uploaded Materials</h3>
+              {isLoadingMaterials ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                </div>
+              ) : materials && materials.length > 0 ? (
+                <div className="space-y-2">
+                  {materials.map((material) => (
+                    <div
+                      key={material.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium text-sm">{material.fileName}</p>
+                          <p className="text-xs text-gray-500">
+                            {(material.fileSize / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteMaterialMutation.mutate(material.id)}
+                        disabled={deleteMaterialMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">
+                  No materials uploaded yet
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Research Objectives Section */}
-      <Card className="shadow-sm">
+      {/* Research Objective Section */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center text-xl">
-            <MessagesSquare className="mr-2 h-5 w-5 text-primary" />
-            Research Objectives
-          </CardTitle>
+          <CardTitle>Research Objective</CardTitle>
           <CardDescription>
-            Define your research goals and create an interview prompt
+            Define what you want to learn from your interviews
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="research-objective">Research Objective</Label>
+        <CardContent>
+          <div className="space-y-4">
             <Textarea
-              id="research-objective"
-              placeholder="Describe what you want to learn or understand from your interviews..."
-              value={researchObjective}
-              onChange={(e) => setResearchObjective(e.target.value)}
-              className="min-h-[100px]"
+              placeholder="E.g., I want to understand user experiences with online food delivery services, focusing on delivery time satisfaction, problems encountered, and features they wish existed..."
+              className="min-h-32"
+              value={objective || project?.researchObjective || ""}
+              onChange={(e) => setObjective(e.target.value)}
             />
-          </div>
-
-          <Button
-            onClick={handleEnhancePrompt}
-            disabled={enhancePromptMutation.isPending || !researchObjective.trim()}
-            className="flex items-center"
-            variant="outline"
-          >
-            {enhancePromptMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enhancing...
-              </>
-            ) : (
-              <>
-                <Lightbulb className="mr-2 h-4 w-4" />
-                Suggest a Prompt
-              </>
-            )}
-          </Button>
-
-          <div className="space-y-2 mt-4">
-            <Label htmlFor="interview-prompt">Interview Prompt</Label>
-            <Textarea
-              id="interview-prompt"
-              placeholder="Your enhanced interview prompt will appear here..."
-              value={interviewPrompt}
-              onChange={(e) => setInterviewPrompt(e.target.value)}
-              className="min-h-[200px]"
-            />
-            <p className="text-xs text-gray-500">
-              This prompt will guide the AI interviewer during conversation with respondents
-            </p>
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={handleSaveObjective}>
+                Save Objective
+              </Button>
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={handleEnhancePrompt}
+                disabled={isEnhancing}
+              >
+                {isEnhancing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Enhance My Prompt
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Interview Prompt Preview Section */}
+      {project?.interviewPrompt && (
+        <Card>
+          <CardHeader>
+            <CardTitle>AI-Enhanced Interview Prompt</CardTitle>
+            <CardDescription>
+              Use this structured prompt template for your interviews
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: project.interviewPrompt.replace(/\n/g, "<br />").replace(
+                    /## (.*?)$/gm,
+                    "<h3>$1</h3>"
+                  ),
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
