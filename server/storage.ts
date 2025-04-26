@@ -1,7 +1,8 @@
 import { 
   users, type User, type InsertUser, 
   projects, type Project, type InsertProject, type UpdateProject,
-  researchMaterials, type ResearchMaterial, type InsertResearchMaterial
+  researchMaterials, type ResearchMaterial, type InsertResearchMaterial,
+  interviewTranscripts, type InterviewTranscript, type InsertTranscript
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -29,6 +30,12 @@ export interface IStorage {
   updateResearchObjective(projectId: number, objective: string): Promise<Project | undefined>;
   updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined>;
   
+  // Interview Transcript methods
+  createTranscript(transcript: InsertTranscript): Promise<InterviewTranscript>;
+  getProjectTranscripts(projectId: number): Promise<InterviewTranscript[]>;
+  getTranscript(id: number): Promise<InterviewTranscript | undefined>;
+  updateTranscriptAnalysis(id: number, summary: string, keyFindings: string, sentimentScore: number): Promise<InterviewTranscript | undefined>;
+  
   sessionStore: any; // Use any for session store type
 }
 
@@ -36,18 +43,22 @@ export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private projects: Map<number, Project>;
   private researchMaterials: Map<number, ResearchMaterial>;
+  private transcripts: Map<number, InterviewTranscript>;
   currentUserId: number;
   currentProjectId: number;
   currentResearchMaterialId: number;
+  currentTranscriptId: number;
   sessionStore: any; // Use any type for sessionStore
 
   constructor() {
     this.users = new Map();
     this.projects = new Map();
     this.researchMaterials = new Map();
+    this.transcripts = new Map();
     this.currentUserId = 1;
     this.currentProjectId = 1;
     this.currentResearchMaterialId = 1;
+    this.currentTranscriptId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
@@ -145,6 +156,49 @@ export class MemStorage implements IStorage {
   
   async updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined> {
     return this.updateProject(projectId, { interviewPrompt: prompt });
+  }
+  
+  // Interview Transcript methods
+  async createTranscript(transcript: InsertTranscript): Promise<InterviewTranscript> {
+    const id = this.currentTranscriptId++;
+    const now = new Date();
+    const newTranscript: InterviewTranscript = {
+      ...transcript,
+      id,
+      conductedAt: now,
+    };
+    this.transcripts.set(id, newTranscript);
+    return newTranscript;
+  }
+  
+  async getProjectTranscripts(projectId: number): Promise<InterviewTranscript[]> {
+    return Array.from(this.transcripts.values())
+      .filter(transcript => transcript.projectId === projectId)
+      .sort((a, b) => b.conductedAt.getTime() - a.conductedAt.getTime()); // Sort by most recent first
+  }
+  
+  async getTranscript(id: number): Promise<InterviewTranscript | undefined> {
+    return this.transcripts.get(id);
+  }
+  
+  async updateTranscriptAnalysis(
+    id: number, 
+    summary: string, 
+    keyFindings: string, 
+    sentimentScore: number
+  ): Promise<InterviewTranscript | undefined> {
+    const transcript = this.transcripts.get(id);
+    if (!transcript) return undefined;
+    
+    const updatedTranscript: InterviewTranscript = {
+      ...transcript,
+      summary,
+      keyFindings,
+      sentimentScore
+    };
+    
+    this.transcripts.set(id, updatedTranscript);
+    return updatedTranscript;
   }
 }
 

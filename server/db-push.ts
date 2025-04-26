@@ -1,5 +1,5 @@
 import { db } from './db';
-import { users, projects, researchMaterials } from '@shared/schema';
+import { users, projects, researchMaterials, interviewTranscripts } from '@shared/schema';
 import { sql } from 'drizzle-orm';
 
 async function main() {
@@ -43,6 +43,23 @@ async function main() {
       )
     `);
     console.log('Research materials table created.');
+
+    // Create interview_transcripts table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS interview_transcripts (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        assistant_id TEXT NOT NULL,
+        participant_name TEXT,
+        conducted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+        transcript_data JSONB NOT NULL,
+        summary TEXT,
+        key_findings TEXT,
+        sentiment_score INTEGER,
+        duration INTEGER
+      )
+    `);
+    console.log('Interview transcripts table created.');
 
     console.log('Database setup complete.');
   } catch (error) {
