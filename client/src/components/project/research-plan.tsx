@@ -21,7 +21,7 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [objective, setObjective] = useState("");
+  const [objective, setObjective] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
 
   // Fetch the current project
@@ -29,6 +29,13 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
     queryKey: ["/api/projects", actualProjectId],
     enabled: actualProjectId > 0, // Only run if we have a valid project ID
   });
+  
+  // Effect to update objective when project data loads
+  useEffect(() => {
+    if (project && objective === null && project.researchObjective) {
+      setObjective(project.researchObjective);
+    }
+  }, [project, objective]);
 
   // Fetch research materials for the project
   const { data: materials, isLoading: isLoadingMaterials } = useQuery<ResearchMaterial[]>({
@@ -194,7 +201,10 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
 
   // Handle objective change
   const handleSaveObjective = () => {
-    if (!objective) {
+    // Use the current objective or fallback to project.researchObjective
+    const currentObjective = objective ?? project?.researchObjective ?? "";
+    
+    if (!currentObjective.trim()) {
       toast({
         title: "Error",
         description: "Please enter a research objective before saving",
@@ -202,7 +212,9 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
       });
       return;
     }
-    updateObjectiveMutation.mutate(objective);
+    
+    // Update in database
+    updateObjectiveMutation.mutate(currentObjective);
   };
 
   // Add state for using knowledge base

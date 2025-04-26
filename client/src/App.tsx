@@ -17,6 +17,7 @@ function Router() {
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/projects/:id" component={ProjectDetailPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/interview/:callId" component={SharedInterviewPage} />
       <Route component={NotFound} />
     </Switch>
   );
