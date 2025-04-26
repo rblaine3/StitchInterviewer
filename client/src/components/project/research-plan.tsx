@@ -88,16 +88,22 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
 
   // Enhance prompt mutation
   const enhancePromptMutation = useMutation({
-    mutationFn: async (objective: string) => {
+    mutationFn: async ({ objective, useKnowledgeBase }: { objective: string, useKnowledgeBase: boolean }) => {
       setIsEnhancing(true);
       const response = await apiRequest("POST", "/api/enhance-prompt", {
         projectId,
         objective,
+        useKnowledgeBase,
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Set the objective to the enhanced prompt to update the text box directly
+      setObjective(data.prompt);
+      
+      // Also update in database
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      
       toast({
         title: "Prompt enhanced",
         description: "Your interview prompt has been enhanced with AI assistance",
@@ -166,9 +172,15 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
     updateObjectiveMutation.mutate(objective);
   };
 
+  // Add state for using knowledge base
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(true);
+
   // Handle enhance prompt
   const handleEnhancePrompt = () => {
-    enhancePromptMutation.mutate(objective || (project?.researchObjective || ""));
+    enhancePromptMutation.mutate({
+      objective: objective || (project?.researchObjective || ""),
+      useKnowledgeBase
+    });
   };
 
   if (isLoadingProject) {
@@ -181,125 +193,142 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
 
   return (
     <div className="space-y-6">
-      {/* Knowledge Base Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Knowledge Base</CardTitle>
-          <CardDescription>
-            Upload documents, images, or any materials related to your research
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* File Upload */}
-            <div>
-              <Label htmlFor="file-upload" className="block mb-2">
-                Upload Files
-              </Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  ref={fileInputRef}
-                  id="file-upload"
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="flex-1"
-                  disabled={isUploading}
+      {/* Knowledge Base and Research Objective Side by Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Knowledge Base Section */}
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Knowledge Base</CardTitle>
+            <CardDescription>
+              Upload documents, images, or any materials related to your research
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* File Upload */}
+              <div>
+                <Label htmlFor="file-upload" className="block mb-2">
+                  Upload Files
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    ref={fileInputRef}
+                    id="file-upload"
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="flex-1"
+                    disabled={isUploading}
+                  />
+                  <Button variant="outline" size="icon" disabled={isUploading}>
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  Accepted file types: PDF, DOCX, TXT, JPG, PNG, etc. (max 10MB)
+                </p>
+              </div>
+
+              {/* Uploaded Files */}
+              <div className="mt-6">
+                <h3 className="font-medium mb-3">Uploaded Materials</h3>
+                {isLoadingMaterials ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  </div>
+                ) : materials && materials.length > 0 ? (
+                  <div className="space-y-2 max-h-96 overflow-auto">
+                    {materials.map((material) => (
+                      <div
+                        key={material.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <p className="font-medium text-sm">{material.fileName}</p>
+                            <p className="text-xs text-gray-500">
+                              {(material.fileSize / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteMaterialMutation.mutate(material.id)}
+                          disabled={deleteMaterialMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    No materials uploaded yet
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Research Objective Section */}
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Research Objective</CardTitle>
+            <CardDescription>
+              Define what you want to learn from your interviews
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Textarea
+                placeholder="E.g., I want to understand user experiences with online food delivery services, focusing on delivery time satisfaction, problems encountered, and features they wish existed..."
+                className="min-h-40"
+                value={objective || project?.researchObjective || ""}
+                onChange={(e) => setObjective(e.target.value)}
+              />
+              
+              <div className="flex items-center space-x-2 mb-4">
+                <input
+                  type="checkbox"
+                  id="use-knowledge-base"
+                  checked={useKnowledgeBase}
+                  onChange={(e) => setUseKnowledgeBase(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
                 />
-                <Button variant="outline" size="icon" disabled={isUploading}>
-                  {isUploading ? (
+                <Label htmlFor="use-knowledge-base" className="text-sm">
+                  Use knowledge base to enhance prompt
+                </Label>
+              </div>
+              
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={handleSaveObjective}>
+                  Save Objective
+                </Button>
+                <Button
+                  variant="default"
+                  className="gap-2"
+                  onClick={handleEnhancePrompt}
+                  disabled={isEnhancing}
+                >
+                  {isEnhancing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4" />
                   )}
+                  Enhance My Prompt
                 </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Accepted file types: PDF, DOCX, TXT, JPG, PNG, etc. (max 10MB)
-              </p>
             </div>
-
-            {/* Uploaded Files */}
-            <div className="mt-6">
-              <h3 className="font-medium mb-3">Uploaded Materials</h3>
-              {isLoadingMaterials ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                </div>
-              ) : materials && materials.length > 0 ? (
-                <div className="space-y-2">
-                  {materials.map((material) => (
-                    <div
-                      key={material.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="font-medium text-sm">{material.fileName}</p>
-                          <p className="text-xs text-gray-500">
-                            {(material.fileSize / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteMaterialMutation.mutate(material.id)}
-                        disabled={deleteMaterialMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">
-                  No materials uploaded yet
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Research Objective Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Research Objective</CardTitle>
-          <CardDescription>
-            Define what you want to learn from your interviews
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="E.g., I want to understand user experiences with online food delivery services, focusing on delivery time satisfaction, problems encountered, and features they wish existed..."
-              className="min-h-32"
-              value={objective || project?.researchObjective || ""}
-              onChange={(e) => setObjective(e.target.value)}
-            />
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={handleSaveObjective}>
-                Save Objective
-              </Button>
-              <Button
-                variant="default"
-                className="gap-2"
-                onClick={handleEnhancePrompt}
-                disabled={isEnhancing}
-              >
-                {isEnhancing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Enhance My Prompt
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Interview Prompt Preview Section */}
       {project?.interviewPrompt && (

@@ -288,14 +288,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({ 
         projectId: z.number(),
-        objective: z.string() 
+        objective: z.string(),
+        useKnowledgeBase: z.boolean().optional(),
       });
       
-      let projectId, objective;
+      let projectId, objective, useKnowledgeBase;
       try {
         const parsed = schema.parse(req.body);
         projectId = parsed.projectId;
         objective = parsed.objective;
+        useKnowledgeBase = parsed.useKnowledgeBase || false;
       } catch (error) {
         if (error instanceof ZodError) {
           const validationError = fromZodError(error);
@@ -313,8 +315,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
+      // If using knowledge base, get the file contents
+      let fileContents: string[] = [];
+      if (useKnowledgeBase) {
+        const materials = await storage.getResearchMaterials(projectId);
+        
+        // Extract content from text files
+        for (const material of materials) {
+          try {
+            if (material.fileType.startsWith('text/')) {
+              const content = fs.readFileSync(material.filePath, 'utf8');
+              // Limit to first 1000 chars to avoid token limits
+              const excerpt = content.substring(0, 1000) + (content.length > 1000 ? '...(truncated)' : '');
+              fileContents.push(`File: ${material.fileName}\n${excerpt}`);
+            }
+          } catch (e) {
+            console.error(`Error reading file ${material.fileName}:`, e);
+          }
+        }
+      }
+      
       // Call OpenAI to enhance the prompt
-      const enhancedPrompt = await enhancePrompt(objective);
+      const enhancedPrompt = await enhancePrompt(objective, fileContents.length > 0 ? fileContents : undefined);
       
       // Update the project with the new prompt
       await storage.updateInterviewPrompt(projectId, enhancedPrompt);
