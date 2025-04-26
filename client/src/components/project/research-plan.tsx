@@ -44,6 +44,10 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Delete research material mutation
   const deleteMaterialMutation = useMutation({
     mutationFn: async (materialId: number) => {
+      if (!projectId) {
+        throw new Error("Project ID is undefined");
+      }
+      
       await apiRequest("DELETE", `/api/research-materials/${materialId}`);
     },
     onSuccess: () => {
@@ -65,6 +69,10 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Update research objective mutation
   const updateObjectiveMutation = useMutation({
     mutationFn: async (objective: string) => {
+      if (!projectId) {
+        throw new Error("Project ID is undefined");
+      }
+      
       const response = await apiRequest("PATCH", `/api/projects/${projectId}/research-objective`, {
         objective,
       });
@@ -89,6 +97,10 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Enhance prompt mutation
   const enhancePromptMutation = useMutation({
     mutationFn: async ({ objective, useKnowledgeBase }: { objective: string, useKnowledgeBase: boolean }) => {
+      if (!projectId) {
+        throw new Error("Project ID is undefined");
+      }
+      
       setIsEnhancing(true);
       const response = await apiRequest("POST", "/api/enhance-prompt", {
         projectId,
@@ -124,6 +136,15 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    
+    if (!projectId) {
+      toast({
+        title: "Error",
+        description: "Project ID is undefined",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsUploading(true);
     
@@ -169,6 +190,14 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
 
   // Handle objective change
   const handleSaveObjective = () => {
+    if (!objective) {
+      toast({
+        title: "Error",
+        description: "Please enter a research objective before saving",
+        variant: "destructive",
+      });
+      return;
+    }
     updateObjectiveMutation.mutate(objective);
   };
 
