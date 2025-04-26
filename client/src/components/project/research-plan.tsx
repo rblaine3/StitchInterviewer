@@ -376,29 +376,7 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
         </Card>
       </div>
 
-      {/* Interview Prompt Preview Section */}
-      {project?.interviewPrompt && (
-        <Card>
-          <CardHeader>
-            <CardTitle>AI-Enhanced Interview Prompt</CardTitle>
-            <CardDescription>
-              Use this structured prompt template for your interviews
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: project.interviewPrompt.replace(/\n/g, "<br />").replace(
-                    /## (.*?)$/gm,
-                    "<h3>$1</h3>"
-                  ),
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* We don't need to display the interview prompt as a separate section anymore */}
     </div>
   );
 }

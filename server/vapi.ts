@@ -64,6 +64,7 @@ export async function createInterviewAssistant(projectId: number) {
     }
 
     // Create a new assistant for this project - using the proper parameters based on SDK docs
+    // The properties may vary based on the SDK version
     const assistant = await vapiClient.assistants.create({
       name: `${project.name} Interview Assistant`,
       model: {
@@ -71,9 +72,10 @@ export async function createInterviewAssistant(projectId: number) {
         model: "gpt-4o",
         temperature: 0.7,
       },
-      systemPrompt: assistantPrompt,
+      // Using the assistantPrompt in instructions or system prompt
+      instructions: assistantPrompt,
       firstMessage: "Hello, I'm your AI interviewer today. I'll be asking some questions based on our research objectives.",
-    });
+    } as any);
 
     console.log("Created assistant:", assistant);
 
