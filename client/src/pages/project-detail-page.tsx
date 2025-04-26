@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectModal from "@/components/project/project-modal";
 import DeleteProjectDialog from "@/components/project/delete-project-dialog";
-import ResearchPlan from "@/components/project/research-plan";
-import TestInterview from "@/components/project/test-interview";
-import ShareInterview from "@/components/project/share-interview";
+
+// Import the new component versions
+import ResearchPlanNew from "@/components/project/research-plan-new";
+import TestInterviewNew from "@/components/project/test-interview-new";
+import ShareInterviewNew from "@/components/project/share-interview-new";
+
 import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Edit, Trash, Loader2, Code, BellIcon, User, LogOut } from "lucide-react";
 import { 
