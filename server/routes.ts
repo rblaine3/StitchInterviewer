@@ -350,10 +350,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enhancedPrompt = await enhancePrompt(objective, fileContents.length > 0 ? fileContents : undefined);
       
       // Update the project with the new prompt
-      await storage.updateInterviewPrompt(projectId, enhancedPrompt);
+      const updatedProject = await storage.updateInterviewPrompt(projectId, enhancedPrompt);
       console.log(`Updated interview prompt for project ${projectId}`);
       
-      res.json({ prompt: enhancedPrompt });
+      res.json({ 
+        prompt: enhancedPrompt,
+        project: updatedProject 
+      });
     } catch (error) {
       console.error("Error enhancing prompt:", error);
       res.status(500).json({ message: "Failed to enhance prompt" });

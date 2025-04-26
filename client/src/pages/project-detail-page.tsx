@@ -183,24 +183,24 @@ export default function ProjectDetailPage() {
             {/* Tab contents */}
             <TabsContent value="research-plan" className="py-6">
               {project && (
-                <ResearchPlan 
-                  projectId={Number(project.id)} 
+                <ResearchPlanNew 
+                  project={project} 
                 />
               )}
             </TabsContent>
             
             <TabsContent value="test-interview" className="py-6">
               {project && (
-                <TestInterview 
-                  projectId={Number(project.id)}
+                <TestInterviewNew 
+                  project={project}
                 />
               )}
             </TabsContent>
             
             <TabsContent value="share" className="py-6">
               {project && (
-                <ShareInterview 
-                  projectId={Number(project.id)}
+                <ShareInterviewNew 
+                  project={project}
                 />
               )}
             </TabsContent>
