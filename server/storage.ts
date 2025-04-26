@@ -166,6 +166,11 @@ export class MemStorage implements IStorage {
       ...transcript,
       id,
       conductedAt: now,
+      participantName: transcript.participantName || null,
+      summary: transcript.summary || null,
+      keyFindings: transcript.keyFindings || null,
+      sentimentScore: transcript.sentimentScore || null,
+      duration: transcript.duration || null
     };
     this.transcripts.set(id, newTranscript);
     return newTranscript;

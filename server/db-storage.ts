@@ -1,12 +1,13 @@
 import { 
   users, type User, type InsertUser, 
   projects, type Project, type InsertProject, type UpdateProject,
-  researchMaterials, type ResearchMaterial, type InsertResearchMaterial
+  researchMaterials, type ResearchMaterial, type InsertResearchMaterial,
+  interviewTranscripts, type InterviewTranscript, type InsertTranscript
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { IStorage } from "./storage";
 
 const PostgresSessionStore = connectPg(session);
@@ -125,6 +126,63 @@ export class DatabaseStorage implements IStorage {
 
   async updateInterviewPrompt(projectId: number, prompt: string): Promise<Project | undefined> {
     return this.updateProject(projectId, { interviewPrompt: prompt });
+  }
+  
+  // Interview Transcript methods
+  async createTranscript(transcript: InsertTranscript): Promise<InterviewTranscript> {
+    const [createdTranscript] = await db
+      .insert(interviewTranscripts)
+      .values({
+        ...transcript,
+        participantName: transcript.participantName || null,
+        summary: transcript.summary || null,
+        keyFindings: transcript.keyFindings || null,
+        sentimentScore: transcript.sentimentScore || null,
+        duration: transcript.duration || null
+      })
+      .returning();
+    
+    return createdTranscript;
+  }
+  
+  async getProjectTranscripts(projectId: number): Promise<InterviewTranscript[]> {
+    const transcripts = await db
+      .select()
+      .from(interviewTranscripts)
+      .where(eq(interviewTranscripts.projectId, projectId));
+    
+    // Sort manually since drizzle-orm order by is being tricky
+    return transcripts.sort((a, b) => {
+      return new Date(b.conductedAt).getTime() - new Date(a.conductedAt).getTime();
+    });
+  }
+  
+  async getTranscript(id: number): Promise<InterviewTranscript | undefined> {
+    const [transcript] = await db
+      .select()
+      .from(interviewTranscripts)
+      .where(eq(interviewTranscripts.id, id));
+      
+    return transcript || undefined;
+  }
+  
+  async updateTranscriptAnalysis(
+    id: number, 
+    summary: string, 
+    keyFindings: string, 
+    sentimentScore: number
+  ): Promise<InterviewTranscript | undefined> {
+    const [updatedTranscript] = await db
+      .update(interviewTranscripts)
+      .set({ 
+        summary, 
+        keyFindings, 
+        sentimentScore 
+      })
+      .where(eq(interviewTranscripts.id, id))
+      .returning();
+      
+    return updatedTranscript || undefined;
   }
 }
 
