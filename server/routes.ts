@@ -447,6 +447,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transcript API endpoints
+  app.post("/api/transcripts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const transcript = await storage.createTranscript(req.body);
+      res.status(201).json(transcript);
+    } catch (error) {
+      console.error("Error creating transcript:", error);
+      res.status(500).json({ message: "Failed to create transcript" });
+    }
+  });
+
+  app.get("/api/projects/:id/transcripts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const transcripts = await storage.getProjectTranscripts(projectId);
+      res.json(transcripts);
+    } catch (error) {
+      console.error("Error fetching project transcripts:", error);
+      res.status(500).json({ message: "Failed to fetch transcripts" });
+    }
+  });
+
+  app.get("/api/transcripts/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const transcriptId = parseInt(req.params.id);
+      if (isNaN(transcriptId)) {
+        return res.status(400).json({ message: "Invalid transcript ID" });
+      }
+      
+      const transcript = await storage.getTranscript(transcriptId);
+      if (!transcript) {
+        return res.status(404).json({ message: "Transcript not found" });
+      }
+      
+      // Check if user has access to the project this transcript belongs to
+      const project = await storage.getProject(transcript.projectId);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(transcript);
+    } catch (error) {
+      console.error("Error fetching transcript:", error);
+      res.status(500).json({ message: "Failed to fetch transcript" });
+    }
+  });
+
+  app.patch("/api/transcripts/:id/analyze", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const transcriptId = parseInt(req.params.id);
+      if (isNaN(transcriptId)) {
+        return res.status(400).json({ message: "Invalid transcript ID" });
+      }
+      
+      const { summary, keyFindings, sentimentScore } = req.body;
+      
+      // Check if transcript exists and user has access
+      const transcript = await storage.getTranscript(transcriptId);
+      if (!transcript) {
+        return res.status(404).json({ message: "Transcript not found" });
+      }
+      
+      // Check if user has access to the project this transcript belongs to
+      const project = await storage.getProject(transcript.projectId);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updatedTranscript = await storage.updateTranscriptAnalysis(
+        transcriptId,
+        summary,
+        keyFindings,
+        sentimentScore
+      );
+      
+      res.json(updatedTranscript);
+    } catch (error) {
+      console.error("Error updating transcript analysis:", error);
+      res.status(500).json({ message: "Failed to update transcript analysis" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
