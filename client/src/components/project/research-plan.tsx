@@ -11,10 +11,12 @@ import { Upload, Trash2, Loader2, FileText, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ResearchPlanProps {
-  projectId: number;
+  projectId: number | undefined;
 }
 
 export default function ResearchPlan({ projectId }: ResearchPlanProps) {
+  // Early guard for undefined projectId
+  const actualProjectId = projectId || 0;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,14 +26,16 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
 
   // Fetch the current project
   const { data: project, isLoading: isLoadingProject } = useQuery<Project>({
-    queryKey: ["/api/projects", projectId],
+    queryKey: ["/api/projects", actualProjectId],
+    enabled: actualProjectId > 0, // Only run if we have a valid project ID
   });
 
   // Fetch research materials for the project
   const { data: materials, isLoading: isLoadingMaterials } = useQuery<ResearchMaterial[]>({
-    queryKey: ["/api/projects", projectId, "research-materials"],
+    queryKey: ["/api/projects", actualProjectId, "research-materials"],
+    enabled: actualProjectId > 0, // Only run if we have a valid project ID
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/research-materials`, {
+      const response = await fetch(`/api/projects/${actualProjectId}/research-materials`, {
         credentials: "include",
       });
       if (!response.ok) {
@@ -44,14 +48,14 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Delete research material mutation
   const deleteMaterialMutation = useMutation({
     mutationFn: async (materialId: number) => {
-      if (!projectId) {
-        throw new Error("Project ID is undefined");
+      if (actualProjectId <= 0) {
+        throw new Error("Project ID is invalid");
       }
       
       await apiRequest("DELETE", `/api/research-materials/${materialId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "research-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", actualProjectId, "research-materials"] });
       toast({
         title: "Material deleted",
         description: "The material has been removed from your project",
@@ -69,17 +73,17 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Update research objective mutation
   const updateObjectiveMutation = useMutation({
     mutationFn: async (objective: string) => {
-      if (!projectId) {
-        throw new Error("Project ID is undefined");
+      if (actualProjectId <= 0) {
+        throw new Error("Project ID is invalid");
       }
       
-      const response = await apiRequest("PATCH", `/api/projects/${projectId}/research-objective`, {
+      const response = await apiRequest("PATCH", `/api/projects/${actualProjectId}/research-objective`, {
         objective,
       });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", actualProjectId] });
       toast({
         title: "Research objective updated",
         description: "Your research objective has been saved",
@@ -97,13 +101,13 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
   // Enhance prompt mutation
   const enhancePromptMutation = useMutation({
     mutationFn: async ({ objective, useKnowledgeBase }: { objective: string, useKnowledgeBase: boolean }) => {
-      if (!projectId) {
-        throw new Error("Project ID is undefined");
+      if (actualProjectId <= 0) {
+        throw new Error("Project ID is invalid");
       }
       
       setIsEnhancing(true);
       const response = await apiRequest("POST", "/api/enhance-prompt", {
-        projectId,
+        projectId: actualProjectId,
         objective,
         useKnowledgeBase,
       });
@@ -114,7 +118,7 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
       setObjective(data.prompt);
       
       // Also update in database
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", actualProjectId] });
       
       toast({
         title: "Prompt enhanced",
@@ -137,10 +141,10 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     
-    if (!projectId) {
+    if (actualProjectId <= 0) {
       toast({
         title: "Error",
-        description: "Project ID is undefined",
+        description: "Project ID is invalid",
         variant: "destructive",
       });
       return;
@@ -150,7 +154,7 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
     
     try {
       const formData = new FormData();
-      formData.append("projectId", projectId.toString());
+      formData.append("projectId", actualProjectId.toString());
       
       for (let i = 0; i < files.length; i++) {
         formData.append("files", files[i]);
@@ -166,7 +170,7 @@ export default function ResearchPlan({ projectId }: ResearchPlanProps) {
         throw new Error("Upload failed");
       }
       
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "research-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", actualProjectId, "research-materials"] });
       
       toast({
         title: "Files uploaded",
