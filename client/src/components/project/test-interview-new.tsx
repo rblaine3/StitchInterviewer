@@ -200,12 +200,6 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
             if (mockVapi.mockTranscriptInterval) {
               clearInterval(mockVapi.mockTranscriptInterval);
             }
-            
-            // Trigger call-end callbacks to enable auto-save transcript
-            if (mockVapi.callEndCallbacks && mockVapi.callEndCallbacks.length > 0) {
-              console.log("Triggering call-end callbacks for auto-save transcript");
-              mockVapi.callEndCallbacks.forEach(callback => callback());
-            }
           },
           setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
           start: async () => {
@@ -256,41 +250,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
               mockVapi.mockVolumeInterval = interval;
               return interval;
             }
-            
-            // Store call-end event listeners
-            if (event === 'call-end') {
-              if (!mockVapi.callEndCallbacks) {
-                // @ts-ignore - adding custom property
-                mockVapi.callEndCallbacks = [];
-              }
-              // @ts-ignore - using custom property
-              mockVapi.callEndCallbacks.push(callback);
-              
-              // Register for call-end events in the mock
-              return null;
-            }
-            
-            // Store call-start event listeners
-            if (event === 'call-start') {
-              if (!mockVapi.callStartCallbacks) {
-                // @ts-ignore - adding custom property
-                mockVapi.callStartCallbacks = [];
-              }
-              // @ts-ignore - using custom property
-              mockVapi.callStartCallbacks.push(callback);
-              
-              // Immediately call the callback
-              setTimeout(() => callback(), 500);
-            }
-            
             // Add other event listeners here as needed
             return null;
           },
-          // Properties to store intervals and callbacks for cleanup
+          // Properties to store intervals for cleanup
           mockVolumeInterval: null as number | null,
-          mockTranscriptInterval: null as number | null,
-          callEndCallbacks: [] as Function[],
-          callStartCallbacks: [] as Function[]
+          mockTranscriptInterval: null as number | null
         };
         
         // Simulate volume levels
@@ -347,12 +312,6 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       vapi.on("call-end", () => {
         console.log("Interview call ended");
         setIsInterviewActive(false);
-        
-        // Auto-save transcript when call ends unexpectedly
-        if (transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
-          console.log("Auto-saving transcript on call-end");
-          saveTranscriptMutation.mutate();
-        }
       });
 
       // Set up event listeners for speech start/end
@@ -410,18 +369,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     }
   };
 
-  // End the interview and automatically save the transcript
+  // End the interview
   const endInterview = () => {
     if (vapiInstance) {
       vapiInstance.stop();
       setVapiInstance(null);
       setIsInterviewActive(false);
-      
-      // Automatically save the transcript if we have messages and it hasn't been saved already
-      if (transcript.length > 0 && !transcriptSaved) {
-        // Auto-save the transcript without showing the dialog
-        saveTranscriptMutation.mutate();
-      }
     }
   };
 
@@ -455,12 +408,6 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     }
     
     return () => {
-      // Check if we need to save transcript before cleanup
-      if (isInterviewActive && transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
-        console.log("Auto-saving transcript on component unmount");
-        saveTranscriptMutation.mutate();
-      }
-      
       // Clean up Vapi instance
       if (vapiInstance) {
         vapiInstance.stop();
@@ -475,7 +422,7 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
         clearInterval(transcriptInterval);
       }
     };
-  }, [vapiInstance, isInterviewActive, transcript, transcriptSaved, isSavingTranscript]);
+  }, [vapiInstance]);
 
   // Format timestamp for display
   const formatTime = (date: Date): string => {
@@ -530,6 +477,24 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                       {isMuted ? <Volume className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
                     </Button>
                     <Button 
+                      variant={transcriptSaved ? "outline" : "secondary"}
+                      onClick={() => setShowSaveDialog(true)}
+                      disabled={transcript.length === 0 || transcriptSaved}
+                      className="px-6"
+                    >
+                      {transcriptSaved ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save
+                        </>
+                      )}
+                    </Button>
+                    <Button 
                       variant="destructive" 
                       onClick={endInterview}
                       className="px-8"
@@ -537,13 +502,6 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                       End Interview
                     </Button>
                   </div>
-                  {/* Show save status when transcript is saved automatically */}
-                  {transcriptSaved && (
-                    <div className="flex items-center justify-center mt-2 text-sm text-green-600">
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      <span>Transcript saved automatically</span>
-                    </div>
-                  )}
 
                   <div className="text-center text-sm text-gray-500 mt-4">
                     <p>Your AI interviewer is listening to your responses.</p>
