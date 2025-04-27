@@ -19,6 +19,18 @@ export default function SharedInterviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [transcriptSaved, setTranscriptSaved] = useState(false);
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false);
+  
+  // For storing transcript
+  type MessageType = 'assistant' | 'user';
+  interface TranscriptMessage {
+    id: string;
+    type: MessageType;
+    text: string;
+    timestamp: Date;
+  }
+  const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   
   // Fetch the API key when component mounts
   useEffect(() => {
@@ -80,9 +92,39 @@ export default function SharedInterviewPage() {
               }
             },
             setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
-            start: async () => console.log("Mock Vapi start called"),
+            start: async () => {
+              console.log("Mock Vapi start called");
+              
+              // Simulate initial assistant message for testing
+              setTimeout(() => {
+                if (mockVapi.messageCallbacks && mockVapi.messageCallbacks.length) {
+                  mockVapi.messageCallbacks.forEach(cb => {
+                    cb({
+                      type: "transcript",
+                      transcript: {
+                        speaker: "assistant",
+                        text: "Hello! I'm your AI interviewer today. Could you tell me a bit about yourself?"
+                      }
+                    });
+                  });
+                }
+              }, 2000);
+              
+              return { id: "mock-call-id" };
+            },
             on: (event: string, callback: Function) => {
               console.log(`Mock Vapi registered listener for ${event}`);
+              
+              // Store message callbacks for transcript simulation
+              if (event === 'message') {
+                if (!mockVapi.messageCallbacks) {
+                  // @ts-ignore - adding custom property
+                  mockVapi.messageCallbacks = [];
+                }
+                // @ts-ignore - using custom property
+                mockVapi.messageCallbacks.push(callback);
+              }
+              
               // Simulate volume changes
               if (event === 'volume-level' && callback) {
                 // Start a volume simulation interval
@@ -98,13 +140,27 @@ export default function SharedInterviewPage() {
               }
               return null;
             },
-            // Property to store volume interval for cleanup
-            mockVolumeInterval: null as number | null
+            // Properties for mock functionality
+            mockVolumeInterval: null as number | null,
+            messageCallbacks: [] as Function[]
           };
           
           // Simulate volume levels
           mockVapi.on('volume-level', (level: number) => {
             setVolume(level);
+          });
+          
+          // Set up message handling for transcript
+          mockVapi.on('message', (message: any) => {
+            // Process different message types as we do with the real Vapi
+            if (message.type === "transcript") {
+              setTranscript(prev => [...prev, {
+                id: `transcript-${Date.now()}`,
+                type: message.transcript.speaker === 'assistant' ? 'assistant' : 'user',
+                text: message.transcript.text || "",
+                timestamp: new Date()
+              }]);
+            }
           });
           
           // Simulate call initiation
@@ -156,6 +212,17 @@ export default function SharedInterviewPage() {
 
         vapi.on("message", (message: any) => {
           console.log("Message received:", message);
+          
+          // Process different message types
+          if (message.type === "transcript") {
+            // Handle transcript updates
+            setTranscript(prev => [...prev, {
+              id: `transcript-${Date.now()}`,
+              type: message.transcript.speaker === 'assistant' ? 'assistant' : 'user',
+              text: message.transcript.text || "",
+              timestamp: new Date()
+            }]);
+          }
         });
 
         vapi.on("error", (error: Error) => {
@@ -216,12 +283,94 @@ export default function SharedInterviewPage() {
     }
   };
 
-  // End the interview
+  // Save transcript mutation - automatically save transcript at the end
+  const saveTranscriptMutation = useMutation({
+    mutationFn: async () => {
+      if (transcript.length === 0) {
+        return null; // Don't save empty transcripts
+      }
+      
+      setIsSavingTranscript(true);
+      
+      // Extract project ID from the assistant ID (if available from the response)
+      let projectId: number | null = null;
+      try {
+        const response = await fetch(`/api/assistants/${assistantId}`);
+        if (response.ok) {
+          const assistantData = await response.json();
+          projectId = assistantData.projectId || null;
+        }
+      } catch (error) {
+        console.error("Error fetching assistant data:", error);
+        // Continue anyway - we'll still save the transcript even if we can't get the project ID
+      }
+      
+      if (!projectId) {
+        console.warn("Could not determine project ID for transcript. Using fallback.");
+        // If we can't get a project ID, we'll use a dummy one that will be fixed on the server
+        projectId = 0; 
+      }
+      
+      // Calculate duration in seconds from first to last transcript message
+      let durationSeconds = 0;
+      if (transcript.length > 1) {
+        const firstMsg = transcript[0];
+        const lastMsg = transcript[transcript.length - 1];
+        durationSeconds = Math.round(
+          (lastMsg.timestamp.getTime() - firstMsg.timestamp.getTime()) / 1000
+        );
+      }
+      
+      // Create transcript data
+      const transcriptData = {
+        projectId,
+        assistantId: assistantId!,
+        participantName: "External Participant", // Default name for shared interviews
+        transcriptData: transcript,
+        duration: durationSeconds
+      };
+      
+      const response = await fetch("/api/transcripts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(transcriptData)
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to save transcript");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsSavingTranscript(false);
+      setTranscriptSaved(true);
+      
+      toast({
+        title: "Interview completed",
+        description: "Your responses have been recorded. Thank you for participating!",
+      });
+    },
+    onError: (error: Error) => {
+      setIsSavingTranscript(false);
+      console.error("Failed to save transcript:", error);
+      // Don't show error to external participants - just log it
+    }
+  });
+  
+  // End the interview and automatically save the transcript
   const endInterview = () => {
     if (vapiInstance) {
       vapiInstance.stop();
       setVapiInstance(null);
       setIsInterviewActive(false);
+      
+      // Automatically save the transcript if we have messages
+      if (transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
+        saveTranscriptMutation.mutate();
+      }
     }
   };
 
@@ -324,6 +473,14 @@ export default function SharedInterviewPage() {
                     </Button>
                   </div>
 
+                  {/* Show save status when transcript is being saved or saved automatically */}
+                  {transcriptSaved && (
+                    <div className="flex items-center justify-center mt-2 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      <span>Interview responses saved automatically</span>
+                    </div>
+                  )}
+                  
                   <div className="text-center text-sm text-gray-500 mt-4">
                     <p>Your AI interviewer is listening to your responses.</p>
                     <p>Speak naturally and the conversation will flow like a real interview.</p>
@@ -334,6 +491,18 @@ export default function SharedInterviewPage() {
                   <p className="text-gray-600">
                     This interview has ended. Thank you for your participation.
                   </p>
+                  {isSavingTranscript && (
+                    <div className="flex items-center justify-center mt-2 text-sm text-blue-600">
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      <span>Saving your responses...</span>
+                    </div>
+                  )}
+                  {transcriptSaved && (
+                    <div className="flex items-center justify-center mt-2 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      <span>Your responses have been saved</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
