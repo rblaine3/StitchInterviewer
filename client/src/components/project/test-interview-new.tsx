@@ -200,6 +200,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
             if (mockVapi.mockTranscriptInterval) {
               clearInterval(mockVapi.mockTranscriptInterval);
             }
+            
+            // Trigger call-end callbacks to enable auto-save transcript
+            if (mockVapi.callEndCallbacks && mockVapi.callEndCallbacks.length > 0) {
+              console.log("Triggering call-end callbacks for auto-save transcript");
+              mockVapi.callEndCallbacks.forEach(callback => callback());
+            }
           },
           setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
           start: async () => {
@@ -259,6 +265,9 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
               }
               // @ts-ignore - using custom property
               mockVapi.callEndCallbacks.push(callback);
+              
+              // Register for call-end events in the mock
+              return null;
             }
             
             // Store call-start event listeners
@@ -446,6 +455,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     }
     
     return () => {
+      // Check if we need to save transcript before cleanup
+      if (isInterviewActive && transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
+        console.log("Auto-saving transcript on component unmount");
+        saveTranscriptMutation.mutate();
+      }
+      
       // Clean up Vapi instance
       if (vapiInstance) {
         vapiInstance.stop();
@@ -460,7 +475,7 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
         clearInterval(transcriptInterval);
       }
     };
-  }, [vapiInstance]);
+  }, [vapiInstance, isInterviewActive, transcript, transcriptSaved, isSavingTranscript]);
 
   // Format timestamp for display
   const formatTime = (date: Date): string => {

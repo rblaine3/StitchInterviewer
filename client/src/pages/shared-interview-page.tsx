@@ -32,6 +32,83 @@ export default function SharedInterviewPage() {
   }
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   
+  // Save transcript mutation - automatically save transcript at the end
+  const saveTranscriptMutation = useMutation({
+    mutationFn: async () => {
+      if (transcript.length === 0) {
+        return null; // Don't save empty transcripts
+      }
+      
+      setIsSavingTranscript(true);
+      
+      // Extract project ID from the assistant ID (if available from the response)
+      let projectId: number | null = null;
+      try {
+        const response = await fetch(`/api/assistants/${assistantId}`);
+        if (response.ok) {
+          const assistantData = await response.json();
+          projectId = assistantData.projectId || null;
+        }
+      } catch (error) {
+        console.error("Error fetching assistant data:", error);
+        // Continue anyway - we'll still save the transcript even if we can't get the project ID
+      }
+      
+      if (!projectId) {
+        console.warn("Could not determine project ID for transcript. Using fallback.");
+        // If we can't get a project ID, we'll use a dummy one that will be fixed on the server
+        projectId = 0; 
+      }
+      
+      // Calculate duration in seconds from first to last transcript message
+      let durationSeconds = 0;
+      if (transcript.length > 1) {
+        const firstMsg = transcript[0];
+        const lastMsg = transcript[transcript.length - 1];
+        durationSeconds = Math.round(
+          (lastMsg.timestamp.getTime() - firstMsg.timestamp.getTime()) / 1000
+        );
+      }
+      
+      // Create transcript data
+      const transcriptData = {
+        projectId,
+        assistantId: assistantId!,
+        participantName: "External Participant", // Default name for shared interviews
+        transcriptData: transcript,
+        duration: durationSeconds
+      };
+      
+      const response = await fetch("/api/transcripts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(transcriptData)
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to save transcript");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsSavingTranscript(false);
+      setTranscriptSaved(true);
+      
+      toast({
+        title: "Interview completed",
+        description: "Your responses have been recorded. Thank you for participating!",
+      });
+    },
+    onError: (error: Error) => {
+      setIsSavingTranscript(false);
+      console.error("Failed to save transcript:", error);
+      // Don't show error to external participants - just log it
+    }
+  });
+
   // Fetch the API key when component mounts
   useEffect(() => {
     const fetchApiKey = async () => {
@@ -90,6 +167,12 @@ export default function SharedInterviewPage() {
               if (mockVapi.mockVolumeInterval) {
                 clearInterval(mockVapi.mockVolumeInterval);
               }
+              
+              // Trigger call-end callbacks to enable auto-save transcript
+              if (mockVapi.callEndCallbacks && mockVapi.callEndCallbacks.length > 0) {
+                console.log("Triggering call-end callbacks for auto-save transcript");
+                mockVapi.callEndCallbacks.forEach(callback => callback());
+              }
             },
             setMuted: (muted: boolean) => console.log("Mock Vapi setMuted:", muted),
             start: async () => {
@@ -125,6 +208,16 @@ export default function SharedInterviewPage() {
                 mockVapi.messageCallbacks.push(callback);
               }
               
+              // Store call-end callbacks
+              if (event === 'call-end') {
+                if (!mockVapi.callEndCallbacks) {
+                  // @ts-ignore - adding custom property
+                  mockVapi.callEndCallbacks = [];
+                }
+                // @ts-ignore - using custom property
+                mockVapi.callEndCallbacks.push(callback);
+              }
+              
               // Simulate volume changes
               if (event === 'volume-level' && callback) {
                 // Start a volume simulation interval
@@ -142,7 +235,8 @@ export default function SharedInterviewPage() {
             },
             // Properties for mock functionality
             mockVolumeInterval: null as number | null,
-            messageCallbacks: [] as Function[]
+            messageCallbacks: [] as Function[],
+            callEndCallbacks: [] as Function[]
           };
           
           // Simulate volume levels
@@ -259,6 +353,12 @@ export default function SharedInterviewPage() {
 
     // Cleanup on unmount
     return () => {
+      // Check if we need to save transcript on unmount
+      if (isInterviewActive && transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
+        console.log("Auto-saving transcript on shared interview page unmount");
+        saveTranscriptMutation.mutate();
+      }
+      
       // Store the volume update interval
       let volumeInterval: number | null = null;
       
@@ -279,7 +379,7 @@ export default function SharedInterviewPage() {
         clearInterval(volumeInterval);
       }
     };
-  }, [assistantId, apiKey, toast]);
+  }, [assistantId, apiKey, toast, isInterviewActive, transcript, transcriptSaved, isSavingTranscript, saveTranscriptMutation]);
 
   // Toggle mute
   const toggleMute = () => {
@@ -289,83 +389,6 @@ export default function SharedInterviewPage() {
     }
   };
 
-  // Save transcript mutation - automatically save transcript at the end
-  const saveTranscriptMutation = useMutation({
-    mutationFn: async () => {
-      if (transcript.length === 0) {
-        return null; // Don't save empty transcripts
-      }
-      
-      setIsSavingTranscript(true);
-      
-      // Extract project ID from the assistant ID (if available from the response)
-      let projectId: number | null = null;
-      try {
-        const response = await fetch(`/api/assistants/${assistantId}`);
-        if (response.ok) {
-          const assistantData = await response.json();
-          projectId = assistantData.projectId || null;
-        }
-      } catch (error) {
-        console.error("Error fetching assistant data:", error);
-        // Continue anyway - we'll still save the transcript even if we can't get the project ID
-      }
-      
-      if (!projectId) {
-        console.warn("Could not determine project ID for transcript. Using fallback.");
-        // If we can't get a project ID, we'll use a dummy one that will be fixed on the server
-        projectId = 0; 
-      }
-      
-      // Calculate duration in seconds from first to last transcript message
-      let durationSeconds = 0;
-      if (transcript.length > 1) {
-        const firstMsg = transcript[0];
-        const lastMsg = transcript[transcript.length - 1];
-        durationSeconds = Math.round(
-          (lastMsg.timestamp.getTime() - firstMsg.timestamp.getTime()) / 1000
-        );
-      }
-      
-      // Create transcript data
-      const transcriptData = {
-        projectId,
-        assistantId: assistantId!,
-        participantName: "External Participant", // Default name for shared interviews
-        transcriptData: transcript,
-        duration: durationSeconds
-      };
-      
-      const response = await fetch("/api/transcripts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(transcriptData)
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to save transcript");
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      setIsSavingTranscript(false);
-      setTranscriptSaved(true);
-      
-      toast({
-        title: "Interview completed",
-        description: "Your responses have been recorded. Thank you for participating!",
-      });
-    },
-    onError: (error: Error) => {
-      setIsSavingTranscript(false);
-      console.error("Failed to save transcript:", error);
-      // Don't show error to external participants - just log it
-    }
-  });
-  
   // End the interview and automatically save the transcript
   const endInterview = () => {
     if (vapiInstance) {
