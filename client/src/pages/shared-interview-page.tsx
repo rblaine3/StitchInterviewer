@@ -23,7 +23,8 @@ export default function SharedInterviewPage() {
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const response = await fetch('/api/config/vapi-key');
+        // Use the public endpoint that doesn't require authentication
+        const response = await fetch('/api/config/public-vapi-key');
         if (response.ok) {
           const data = await response.json();
           setApiKey(data.apiKey);

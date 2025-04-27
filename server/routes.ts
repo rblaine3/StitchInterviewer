@@ -419,6 +419,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json({ apiKey });
   });
+  
+  // Public endpoint for shared interview pages - does not require authentication
+  app.get("/api/config/public-vapi-key", async (req: Request, res: Response) => {
+    // Use the public key for frontend use (not the private key)
+    // The Web SDK requires the public key as per Vapi documentation
+    const apiKey = process.env.VAPI_PUBLIC_KEY;
+    
+    if (!apiKey) {
+      console.error("VAPI_PUBLIC_KEY not configured in environment");
+      return res.status(500).json({ message: "Vapi public key not configured" });
+    }
+    
+    res.json({ apiKey });
+  });
 
   // Generate a shareable interview link
   app.post("/api/projects/:id/share", async (req: Request, res: Response) => {
