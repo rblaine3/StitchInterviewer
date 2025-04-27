@@ -227,7 +227,16 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                 }]);
                 messageIndex++;
               } else {
+                // When finished with all messages, clear interval and auto-save
                 clearInterval(transcriptInterval);
+                
+                // Give a small delay before auto-saving to simulate a real conversation ending
+                setTimeout(() => {
+                  console.log("Mock interview completed, auto-saving transcript");
+                  if (!transcriptSaved) {
+                    saveTranscriptMutation.mutate();
+                  }
+                }, 2000);
               }
             }, 8000); // Add a new message every 8 seconds
             
@@ -312,6 +321,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       vapi.on("call-end", () => {
         console.log("Interview call ended");
         setIsInterviewActive(false);
+        
+        // Auto-save transcript if we have content
+        if (transcript.length > 0 && !transcriptSaved) {
+          console.log("Auto-saving transcript on call end");
+          saveTranscriptMutation.mutate();
+        }
       });
 
       // Set up event listeners for speech start/end
@@ -369,12 +384,18 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     }
   };
 
-  // End the interview
+  // End the interview and auto-save transcript
   const endInterview = () => {
     if (vapiInstance) {
       vapiInstance.stop();
       setVapiInstance(null);
       setIsInterviewActive(false);
+      
+      // Auto-save transcript if we have content and it hasn't been saved yet
+      if (transcript.length > 0 && !transcriptSaved && currentAssistantId) {
+        // Save transcript automatically without requiring user interaction
+        saveTranscriptMutation.mutate();
+      }
     }
   };
 
@@ -476,24 +497,16 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                     >
                       {isMuted ? <Volume className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
                     </Button>
-                    <Button 
-                      variant={transcriptSaved ? "outline" : "secondary"}
-                      onClick={() => setShowSaveDialog(true)}
-                      disabled={transcript.length === 0 || transcriptSaved}
-                      className="px-6"
-                    >
-                      {transcriptSaved ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save
-                        </>
-                      )}
-                    </Button>
+                    {transcriptSaved && (
+                      <Button 
+                        variant="outline" 
+                        disabled
+                        className="px-6"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Transcript Saved
+                      </Button>
+                    )}
                     <Button 
                       variant="destructive" 
                       onClick={endInterview}
