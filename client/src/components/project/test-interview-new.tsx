@@ -250,12 +250,38 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
               mockVapi.mockVolumeInterval = interval;
               return interval;
             }
+            
+            // Store call-end event listeners
+            if (event === 'call-end') {
+              if (!mockVapi.callEndCallbacks) {
+                // @ts-ignore - adding custom property
+                mockVapi.callEndCallbacks = [];
+              }
+              // @ts-ignore - using custom property
+              mockVapi.callEndCallbacks.push(callback);
+            }
+            
+            // Store call-start event listeners
+            if (event === 'call-start') {
+              if (!mockVapi.callStartCallbacks) {
+                // @ts-ignore - adding custom property
+                mockVapi.callStartCallbacks = [];
+              }
+              // @ts-ignore - using custom property
+              mockVapi.callStartCallbacks.push(callback);
+              
+              // Immediately call the callback
+              setTimeout(() => callback(), 500);
+            }
+            
             // Add other event listeners here as needed
             return null;
           },
-          // Properties to store intervals for cleanup
+          // Properties to store intervals and callbacks for cleanup
           mockVolumeInterval: null as number | null,
-          mockTranscriptInterval: null as number | null
+          mockTranscriptInterval: null as number | null,
+          callEndCallbacks: [] as Function[],
+          callStartCallbacks: [] as Function[]
         };
         
         // Simulate volume levels
@@ -312,6 +338,12 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
       vapi.on("call-end", () => {
         console.log("Interview call ended");
         setIsInterviewActive(false);
+        
+        // Auto-save transcript when call ends unexpectedly
+        if (transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
+          console.log("Auto-saving transcript on call-end");
+          saveTranscriptMutation.mutate();
+        }
       });
 
       // Set up event listeners for speech start/end

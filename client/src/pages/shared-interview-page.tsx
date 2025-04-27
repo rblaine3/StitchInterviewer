@@ -200,6 +200,12 @@ export default function SharedInterviewPage() {
         vapi.on("call-end", () => {
           console.log("Interview call ended");
           setIsInterviewActive(false);
+          
+          // Auto-save transcript when the call ends
+          if (transcript.length > 0 && !transcriptSaved && !isSavingTranscript) {
+            console.log("Auto-saving transcript on call-end");
+            saveTranscriptMutation.mutate();
+          }
         });
 
         vapi.on("speech-start", () => {
