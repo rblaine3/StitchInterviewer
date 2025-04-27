@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mic, Volume2, Volume, UserRound, Code } from "lucide-react";
+import { Loader2, Mic, Volume2, Volume, UserRound, Code, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
 import Vapi from "@vapi-ai/web";
 
 // We'll fetch the API key from a secure endpoint

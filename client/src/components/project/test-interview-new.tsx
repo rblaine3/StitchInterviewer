@@ -369,12 +369,18 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
     }
   };
 
-  // End the interview
+  // End the interview and automatically save the transcript
   const endInterview = () => {
     if (vapiInstance) {
       vapiInstance.stop();
       setVapiInstance(null);
       setIsInterviewActive(false);
+      
+      // Automatically save the transcript if we have messages and it hasn't been saved already
+      if (transcript.length > 0 && !transcriptSaved) {
+        // Auto-save the transcript without showing the dialog
+        saveTranscriptMutation.mutate();
+      }
     }
   };
 
@@ -477,24 +483,6 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                       {isMuted ? <Volume className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
                     </Button>
                     <Button 
-                      variant={transcriptSaved ? "outline" : "secondary"}
-                      onClick={() => setShowSaveDialog(true)}
-                      disabled={transcript.length === 0 || transcriptSaved}
-                      className="px-6"
-                    >
-                      {transcriptSaved ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                    <Button 
                       variant="destructive" 
                       onClick={endInterview}
                       className="px-8"
@@ -502,6 +490,13 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                       End Interview
                     </Button>
                   </div>
+                  {/* Show save status when transcript is saved automatically */}
+                  {transcriptSaved && (
+                    <div className="flex items-center justify-center mt-2 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      <span>Transcript saved automatically</span>
+                    </div>
+                  )}
 
                   <div className="text-center text-sm text-gray-500 mt-4">
                     <p>Your AI interviewer is listening to your responses.</p>
