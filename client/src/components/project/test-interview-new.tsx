@@ -1,14 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Mic, UserRound, Volume, Volume2, MessageSquare } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Loader2, Mic, UserRound, Volume, Volume2, MessageSquare, Save, CheckCircle2 } from "lucide-react";
 import { Project } from "@shared/schema";
 import Vapi from "@vapi-ai/web";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Debug line to check for API key in environment variables
 console.log("Frontend environment variables:", Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
@@ -27,6 +37,11 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
   const [volume, setVolume] = useState(0);
   const [isCreatingCall, setIsCreatingCall] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [currentAssistantId, setCurrentAssistantId] = useState<string | null>(null);
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [participantName, setParticipantName] = useState("");
+  const [transcriptSaved, setTranscriptSaved] = useState(false);
   
   // Fetch the API key from the server
   useEffect(() => {
@@ -84,9 +99,62 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
   });
 
   // Initialize the Vapi client when the interview is started
+  // Save transcript mutation
+  const saveTranscriptMutation = useMutation({
+    mutationFn: async () => {
+      setIsSavingTranscript(true);
+      
+      // Calculate duration in seconds from first to last transcript message
+      let durationSeconds = 0;
+      if (transcript.length > 1) {
+        const firstMsg = transcript[0];
+        const lastMsg = transcript[transcript.length - 1];
+        durationSeconds = Math.round(
+          (lastMsg.timestamp.getTime() - firstMsg.timestamp.getTime()) / 1000
+        );
+      }
+      
+      // Create transcript data
+      const transcriptData = {
+        projectId,
+        assistantId: currentAssistantId!,
+        participantName: participantName || null,
+        transcriptData: transcript,
+        duration: durationSeconds
+      };
+      
+      const response = await apiRequest("POST", "/api/transcripts", transcriptData);
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsSavingTranscript(false);
+      setShowSaveDialog(false);
+      setTranscriptSaved(true);
+      
+      // Update transcripts list if we're viewing it
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "transcripts"] });
+      
+      toast({
+        title: "Transcript saved",
+        description: "The interview transcript has been saved successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      setIsSavingTranscript(false);
+      toast({
+        title: "Failed to save transcript",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+  
   const startInterview = async (assistantId: string) => {
     try {
       console.log("Starting interview with assistant ID:", assistantId);
+      
+      // Save the assistantId for later use when saving transcript
+      setCurrentAssistantId(assistantId);
       
       // If we don't have an API key yet, wait for it
       if (!apiKey) {
@@ -409,6 +477,24 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
                       {isMuted ? <Volume className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
                     </Button>
                     <Button 
+                      variant={transcriptSaved ? "outline" : "secondary"}
+                      onClick={() => setShowSaveDialog(true)}
+                      disabled={transcript.length === 0 || transcriptSaved}
+                      className="px-6"
+                    >
+                      {transcriptSaved ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save
+                        </>
+                      )}
+                    </Button>
+                    <Button 
                       variant="destructive" 
                       onClick={endInterview}
                       className="px-8"
@@ -503,6 +589,53 @@ export default function TestInterviewNew({ project }: TestInterviewProps) {
           )}
         </CardContent>
       </Card>
+      
+      {/* Save Transcript Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Save Interview Transcript</DialogTitle>
+            <DialogDescription>
+              Save this interview transcript to review later or share with your team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="participant" className="text-right">
+                Participant
+              </Label>
+              <Input
+                id="participant"
+                placeholder="Enter participant name (optional)"
+                className="col-span-3"
+                value={participantName}
+                onChange={(e) => setParticipantName(e.target.value)}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground mt-2">
+              <p>This transcript contains {transcript.length} messages and will be saved to your project.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => saveTranscriptMutation.mutate()} 
+              disabled={isSavingTranscript}
+            >
+              {isSavingTranscript ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Transcript"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
